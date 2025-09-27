@@ -69,9 +69,7 @@ def get_drag(cd_array, velocity: float, percent_deploy: float, altitude: float, 
     drag = 1/2*rho*V**2*cd*A
     return drag
 
-def get_acceleration(state, accel_consts, drag_args) -> float:
-    altitude = state[0]
-    velocity = state[1]
+def get_acceleration(altitude: float, velocity: float, accel_consts, drag_args) -> float:
     mass = accel_consts[0]
     thrust = accel_consts[1]
     gravity = accel_consts[2]
@@ -82,49 +80,42 @@ def get_acceleration(state, accel_consts, drag_args) -> float:
     acceleration = (thrust - drag)/mass - gravity
     return acceleration
 
-def runge_kutta(state, accel_consts, drag_args, dt: float):
-    altitude = state[0]
-    velocity = state[1]
+def runge_kutta(altitude: float, velocity: float, accel_consts, drag_args, dt: float):
+    
+    k1_velocity = velocity # k1 = f(y0, t0)
+    k1_acceleration = get_acceleration(altitude, k1_velocity, accel_consts, drag_args)
 
-    k1_velocity = state[1] # k1 = f(y0, t0)
-    k1_acceleration = get_acceleration(state, accel_consts, drag_args)
-    state[0] = altitude + 1/2*k1_velocity*dt
-    state[1] = velocity + 1/2*k1_acceleration*dt
+    k2_velocity = velocity + 1/2*k1_acceleration*dt # k2 = f(y0+(k1 * dt/2), t0+(dt/2))
+    k2_acceleration = get_acceleration(altitude + 1/2*k1_velocity*dt, k2_velocity, accel_consts, drag_args)
 
-    k2_velocity = state[1] # k2 = f(y0+(k1 * dt/2), t0+(dt/2))
-    k2_acceleration = get_acceleration(state, accel_consts, drag_args)
-    state[0] = altitude + 1/2*k2_velocity*dt
-    state[1] = velocity + 1/2*k2_acceleration*dt
+    k3_velocity = velocity + 1/2*k2_acceleration*dt # k3 = f(y0+(k2 * dt/2), t0+(dt/2))
+    k3_acceleration = get_acceleration(altitude + 1/2*k2_velocity*dt, k3_velocity, accel_consts, drag_args)
 
-    k3_velocity = state[1] # k3 = f(y0+(k2 * dt/2), t0+(dt/2))
-    k3_acceleration = get_acceleration(state, accel_consts, drag_args)
-    state[0] = altitude + k3_velocity*dt
-    state[1] = velocity + k3_acceleration*dt
-
-    k4_velocity = state[1] # k4 = f(y0+(k3*dt), t0+dt)
-    k4_acceleration = get_acceleration(state, accel_consts, drag_args)
+    k4_velocity = velocity + k3_acceleration*dt # k4 = f(y0+(k3*dt), t0+dt)
+    k4_acceleration = get_acceleration(altitude + k3_velocity*dt, k4_velocity, accel_consts, drag_args)
 
     # y1 = y0 + (1/6)*(k1 + 2*k2 + 2*k3 + k4)*dt
-    state[0] = altitude + 1/6*(k1_velocity + 2*k2_velocity + 2*k3_velocity + k4_velocity)*dt
-    state[1] = velocity + 1/6*(k1_acceleration + 2*k2_acceleration + 2*k3_acceleration + k4_acceleration)*dt
+    
+    return (
+        altitude + 1/6*(k1_velocity + 2*k2_velocity + 2*k3_velocity + k4_velocity)*dt,
+        velocity + 1/6*(k1_acceleration + 2*k2_acceleration + 2*k3_acceleration + k4_acceleration)*dt
+    )
 
-    return state
-
-def deploy_brakes(target_apogee, state, accel_consts, drag_args, dt: float):
+def deploy_brakes(target_apogee, altitude: float, velocity: float, accel_consts, drag_args, dt: float):
     apogee_error = 5
     deploy_time = 3
     percent_deploy = drag_args[1]
 
     # propogate to apogee (zero velocity)
-    while state[1] > 0:
-        state = runge_kutta(state, accel_consts, drag_args, dt)
+    while velocity > 0:
+        altitude, velocity = runge_kutta(altitude, velocity, accel_consts, drag_args, dt)
 
     # if overshooting, increase brake deployment
-    if (state[0] - target_apogee) > apogee_error:
+    if (altitude - target_apogee) > apogee_error:
         percent_deploy = percent_deploy + 100/(deploy_time/dt) 
     
     # else if undershooting, reduce brake deployment
-    elif (state[0] - target_apogee) < -apogee_error:
+    elif (altitude - target_apogee) < -apogee_error:
         percent_deploy = percent_deploy - 100/(deploy_time/dt)
     
     percent_deploy = np.clip(percent_deploy, 0, 100)
@@ -155,23 +146,23 @@ def run_simulation(cd_array, target_apogee: float, dt: float):
 
     ### Run to apogee
     while velocity[n] >= 0:
-        state = [altitude[n], velocity[n]] #prev state alt/vel
-        state = runge_kutta(state, accel_consts, drag_args, dt) # propogate to next altitude/velocity
+        altitude_current, velocity_current = (altitude[n], velocity[n]) #prev state alt/vel
+        altitude_current, velocity_current = runge_kutta(altitude_current, velocity_current, accel_consts, drag_args, dt) # propogate to next altitude/velocity
         n = n + 1
         time.append(n*dt) 
-        altitude.append(state[0]) #update to new runge kutta altitude
-        velocity.append(state[1]) #update to new velocity
-        acceleration.append(get_acceleration(state, accel_consts, drag_args))
+        altitude.append(altitude_current) #update to new runge kutta altitude
+        velocity.append(velocity_current) #update to new velocity
+        acceleration.append(get_acceleration(altitude_current, velocity_current, accel_consts, drag_args))
         if time[n] > burn_time: #begin after burnout
             accel_consts[1] = 0 #turn off motor
             accel_consts[0] = burnout_mass # remove motor mass
-            if time[n] > (burn_time+1) and state[1] < 411:
+            if time[n] > (burn_time+1) and velocity_current < 411:
                 if deployment_altitude is None:
-                    deployment_velocity = state[1]
-                    deployment_altitude = state[0]
+                    deployment_velocity = velocity_current
+                    deployment_altitude = altitude_current
                     print("Brake Deployment Velocity (FB): {:0.0f}".format(deployment_velocity))
                     print("Brake Deployment Altitude (FB): {:0.0f}".format(deployment_altitude))
-                percent_deploy.append(deploy_brakes(target_apogee, state, accel_consts, drag_args, dt)) #determine braking amount
+                percent_deploy.append(deploy_brakes(target_apogee, altitude_current, velocity_current, accel_consts, drag_args, dt)) #determine braking amount
                 drag_args[1] = percent_deploy[n] # add brake drag to computations
             else:
                 percent_deploy.append(0) #brakes not deployed before burnout        
