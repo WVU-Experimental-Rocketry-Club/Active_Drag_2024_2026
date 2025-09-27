@@ -16,7 +16,7 @@ cd_fb = np.array([cd_base, cd_fb50, cd_fb100]).transpose()
 
 
 
-def calculate_cd_interpolation(cd_array, velocity: float, percent_deploy: float) -> float:
+def cd_interp(cd_array, velocity, percent_deploy: float):
     sound_speed = 340
     mach_num = velocity/sound_speed
     mach_pts = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
@@ -65,7 +65,7 @@ def get_drag(cd_array, velocity: float, percent_deploy: float, altitude: float, 
     V = velocity
     A = np.pi*(diameter/2)**2
     rho = get_atmosphere_density(altitude)
-    cd = calculate_cd_interpolation(cd_array, velocity, percent_deploy)
+    cd = cd_interp(cd_array, velocity, percent_deploy)
     drag = 1/2*rho*V**2*cd*A
     return drag
 
@@ -117,7 +117,7 @@ def deploy_brakes(target_apogee, state, accel_consts, drag_args, dt: float):
 
     # propogate to apogee (zero velocity)
     while state[1] > 0:
-        state = runge_kutta([], accel_consts, drag_args, dt)
+        state = runge_kutta(state, accel_consts, drag_args, dt)
 
     # if overshooting, increase brake deployment
     if (state[0] - target_apogee) > apogee_error:
