@@ -69,30 +69,24 @@ def get_drag(cd_array, velocity: float, percent_deploy: float, altitude: float, 
     drag = 1/2*rho*V**2*cd*A
     return drag
 
-def get_acceleration(altitude: float, velocity: float, accel_consts, drag_args) -> float:
-    mass = accel_consts[0]
-    thrust = accel_consts[1]
-    gravity = accel_consts[2]
-    cd_array = drag_args[0]
-    percent_deploy = drag_args[1]
-    diameter = drag_args[2]
+def get_acceleration(altitude: float, velocity: float, mass: float, thrust: float, gravity: float, cd_array, percent_deploy: float, diameter: float) -> float:
     drag = get_drag(cd_array, velocity, percent_deploy, altitude, diameter)
     acceleration = (thrust - drag)/mass - gravity
     return acceleration
 
-def runge_kutta(altitude: float, velocity: float, accel_consts, drag_args, dt: float):
+def runge_kutta(altitude: float, velocity: float, mass: float, thrust: float, gravity: float, cd_array, percent_deploy: float, diameter: float, dt: float):
     
     k1_velocity = velocity # k1 = f(y0, t0)
-    k1_acceleration = get_acceleration(altitude, k1_velocity, accel_consts, drag_args)
+    k1_acceleration = get_acceleration(altitude, k1_velocity, mass, thrust, gravity, cd_array, percent_deploy, diameter)
 
     k2_velocity = velocity + 1/2*k1_acceleration*dt # k2 = f(y0+(k1 * dt/2), t0+(dt/2))
-    k2_acceleration = get_acceleration(altitude + 1/2*k1_velocity*dt, k2_velocity, accel_consts, drag_args)
+    k2_acceleration = get_acceleration(altitude + 1/2*k1_velocity*dt, k2_velocity, mass, thrust, gravity, cd_array, percent_deploy, diameter)
 
     k3_velocity = velocity + 1/2*k2_acceleration*dt # k3 = f(y0+(k2 * dt/2), t0+(dt/2))
-    k3_acceleration = get_acceleration(altitude + 1/2*k2_velocity*dt, k3_velocity, accel_consts, drag_args)
+    k3_acceleration = get_acceleration(altitude + 1/2*k2_velocity*dt, k3_velocity, mass, thrust, gravity, cd_array, percent_deploy, diameter)
 
     k4_velocity = velocity + k3_acceleration*dt # k4 = f(y0+(k3*dt), t0+dt)
-    k4_acceleration = get_acceleration(altitude + k3_velocity*dt, k4_velocity, accel_consts, drag_args)
+    k4_acceleration = get_acceleration(altitude + k3_velocity*dt, k4_velocity, mass, thrust, gravity, cd_array, percent_deploy, diameter)
 
     # y1 = y0 + (1/6)*(k1 + 2*k2 + 2*k3 + k4)*dt
     
@@ -101,14 +95,13 @@ def runge_kutta(altitude: float, velocity: float, accel_consts, drag_args, dt: f
         velocity + 1/6*(k1_acceleration + 2*k2_acceleration + 2*k3_acceleration + k4_acceleration)*dt
     )
 
-def deploy_brakes(target_apogee, altitude: float, velocity: float, accel_consts, drag_args, dt: float):
+def deploy_brakes(target_apogee, altitude: float, velocity: float, mass: float, thrust: float, gravity: float, cd_array, percent_deploy: float, diameter: float, dt: float):
     apogee_error = 5
     deploy_time = 3
-    percent_deploy = drag_args[1]
 
     # propogate to apogee (zero velocity)
     while velocity > 0:
-        altitude, velocity = runge_kutta(altitude, velocity, accel_consts, drag_args, dt)
+        altitude, velocity = runge_kutta(altitude, velocity, mass, thrust, gravity, cd_array, percent_deploy, diameter, dt)
 
     # if overshooting, increase brake deployment
     if (altitude - target_apogee) > apogee_error:
@@ -137,8 +130,7 @@ def run_simulation(cd_array, target_apogee: float, dt: float):
     velocity = [0.0]
     acceleration = [0.0]
     percent_deploy = [0.0]
-    accel_consts = [mass, thrust, gravity]
-    drag_args = [cd_array, percent_deploy[0], diameter]
+    current_deploy_percent = percent_deploy[0]
 
     # Event variables
     deployment_velocity = None
@@ -147,29 +139,29 @@ def run_simulation(cd_array, target_apogee: float, dt: float):
     ### Run to apogee
     while velocity[n] >= 0:
         altitude_current, velocity_current = (altitude[n], velocity[n]) #prev state alt/vel
-        altitude_current, velocity_current = runge_kutta(altitude_current, velocity_current, accel_consts, drag_args, dt) # propogate to next altitude/velocity
+        altitude_current, velocity_current = runge_kutta(altitude_current, velocity_current, mass, thrust, gravity, cd_array, current_deploy_percent, diameter, dt) # propogate to next altitude/velocity
         n = n + 1
         time.append(n*dt) 
         altitude.append(altitude_current) #update to new runge kutta altitude
         velocity.append(velocity_current) #update to new velocity
-        acceleration.append(get_acceleration(altitude_current, velocity_current, accel_consts, drag_args))
+        acceleration.append(get_acceleration(altitude_current, velocity_current, mass, thrust, gravity, cd_array, current_deploy_percent, diameter))
         if time[n] > burn_time: #begin after burnout
-            accel_consts[1] = 0 #turn off motor
-            accel_consts[0] = burnout_mass # remove motor mass
+            thrust = 0 #turn off motor
+            mass = burnout_mass # remove motor mass
             if time[n] > (burn_time+1) and velocity_current < 411:
                 if deployment_altitude is None:
                     deployment_velocity = velocity_current
                     deployment_altitude = altitude_current
                     print("Brake Deployment Velocity (FB): {:0.0f}".format(deployment_velocity))
                     print("Brake Deployment Altitude (FB): {:0.0f}".format(deployment_altitude))
-                percent_deploy.append(deploy_brakes(target_apogee, altitude_current, velocity_current, accel_consts, drag_args, dt)) #determine braking amount
-                drag_args[1] = percent_deploy[n] # add brake drag to computations
+                percent_deploy.append(deploy_brakes(target_apogee, altitude_current, velocity_current, mass, thrust, gravity, cd_array, current_deploy_percent, diameter, dt)) #determine braking amount
+                current_deploy_percent = percent_deploy[n] # add brake drag to computations
             else:
                 percent_deploy.append(0) #brakes not deployed before burnout        
         else:
             percent_deploy.append(0) #brakes not deployed before burnout
             percentPropellantRemaining = 1 - (time[n] / burn_time)
-            accel_consts[0] = burnout_mass + (percentPropellantRemaining * propellant_mass)
+            mass = burnout_mass + (percentPropellantRemaining * propellant_mass)
 
     output = np.array([time, altitude, velocity, acceleration, percent_deploy])
     return output
