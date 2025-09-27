@@ -16,11 +16,12 @@ cd_fb = np.array([cd_base, cd_fb50, cd_fb100]).transpose()
 
 
 
-def cd_interp(cd_array, velocity, percent_deploy):
+def calculate_cd_interpolation(cd_array, velocity: float, percent_deploy: float) -> float:
     sound_speed = 340
     mach_num = velocity/sound_speed
     mach_pts = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
     deploy_pts = [0, 33, 100] # airbrakes off, half, or all on
+    i, j = 0, 0
     # Find closest mach point
     for mach_val in mach_pts: 
         if mach_val > mach_num:
@@ -48,7 +49,7 @@ def cd_interp(cd_array, velocity, percent_deploy):
     cd = (deploy_pts[j+1] - percent_deploy)/(deploy_pts[j+1] - deploy_pts[j])*f1 + (percent_deploy - deploy_pts[j])/(deploy_pts[j+1] - deploy_pts[j])*f2
     return cd
 
-def atm_density(altitude):
+def get_atmosphere_density(altitude: float) -> float:
     rho_b = 1.2250
     Tb = 288.15
     Lb = 0.0065
@@ -60,15 +61,15 @@ def atm_density(altitude):
     rho = rho_b*((Tb - (h - hb)*Lb)/Tb)**((g0*M)/(R*Lb) - 1)
     return rho
 
-def get_drag(cd_array, velocity, percent_deploy, altitude, diameter):
+def get_drag(cd_array, velocity: float, percent_deploy: float, altitude: float, diameter: float) -> float:
     V = velocity
     A = np.pi*(diameter/2)**2
-    rho = atm_density(altitude)
-    cd = cd_interp(cd_array, velocity, percent_deploy)
+    rho = get_atmosphere_density(altitude)
+    cd = calculate_cd_interpolation(cd_array, velocity, percent_deploy)
     drag = 1/2*rho*V**2*cd*A
     return drag
 
-def get_acceleration(state, accel_consts, drag_args):
+def get_acceleration(state, accel_consts, drag_args) -> float:
     altitude = state[0]
     velocity = state[1]
     mass = accel_consts[0]
@@ -81,7 +82,7 @@ def get_acceleration(state, accel_consts, drag_args):
     acceleration = (thrust - drag)/mass - gravity
     return acceleration
 
-def runge_kutta(state, accel_consts, drag_args, dt):
+def runge_kutta(state, accel_consts, drag_args, dt: float):
     altitude = state[0]
     velocity = state[1]
 
@@ -109,14 +110,14 @@ def runge_kutta(state, accel_consts, drag_args, dt):
 
     return state
 
-def deploy_brakes(target_apogee, state, accel_consts, drag_args, dt):
+def deploy_brakes(target_apogee, state, accel_consts, drag_args, dt: float):
     apogee_error = 5
     deploy_time = 3
     percent_deploy = drag_args[1]
 
     # propogate to apogee (zero velocity)
     while state[1] > 0:
-        state = runge_kutta(state, accel_consts, drag_args, dt)
+        state = runge_kutta([], accel_consts, drag_args, dt)
 
     # if overshooting, increase brake deployment
     if (state[0] - target_apogee) > apogee_error:
@@ -129,7 +130,7 @@ def deploy_brakes(target_apogee, state, accel_consts, drag_args, dt):
     percent_deploy = np.clip(percent_deploy, 0, 100)
     return percent_deploy
 
-def run_simulation(cd_array, target_apogee, dt):
+def run_simulation(cd_array, target_apogee: float, dt: float):
     ### Setup/initialization
     mass = 59.95 # kg
     burnout_mass = 40.62 # kg
@@ -140,18 +141,17 @@ def run_simulation(cd_array, target_apogee, dt):
     thrust = total_impulse / burn_time # avg thrust
     gravity = 9.80665 # m/s/s
     n = 0
-    time = [0]
-    altitude = [0]
-    velocity = [0]
-    acceleration = [0]
-    percent_deploy = [0]
+    time = [0.0]
+    altitude = [0.0]
+    velocity = [0.0]
+    acceleration = [0.0]
+    percent_deploy = [0.0]
     accel_consts = [mass, thrust, gravity]
     drag_args = [cd_array, percent_deploy[0], diameter]
 
     # Event variables
-    deploymentVelocity = 0
-    deploymentAltitude = 0
-    initialDeployFlag = False
+    deployment_velocity = None
+    deployment_altitude = None
 
     ### Run to apogee
     while velocity[n] >= 0:
@@ -166,12 +166,11 @@ def run_simulation(cd_array, target_apogee, dt):
             accel_consts[1] = 0 #turn off motor
             accel_consts[0] = burnout_mass # remove motor mass
             if time[n] > (burn_time+1) and state[1] < 411:
-                if(initialDeployFlag == False):
-                    initialDeployFlag = True
-                    deploymentVelocity = state[1]
-                    deploymentAltitude = state[0]
-                    print("Brake Deployment Velocity (FB): {:0.0f}".format(deploymentVelocity))
-                    print("Brake Deployment Altitude (FB): {:0.0f}".format(deploymentAltitude))
+                if deployment_altitude is None:
+                    deployment_velocity = state[1]
+                    deployment_altitude = state[0]
+                    print("Brake Deployment Velocity (FB): {:0.0f}".format(deployment_velocity))
+                    print("Brake Deployment Altitude (FB): {:0.0f}".format(deployment_altitude))
                 percent_deploy.append(deploy_brakes(target_apogee, state, accel_consts, drag_args, dt)) #determine braking amount
                 drag_args[1] = percent_deploy[n] # add brake drag to computations
             else:
