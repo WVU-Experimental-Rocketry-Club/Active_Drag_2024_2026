@@ -2,15 +2,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-dt = 0.1
-target_apogee = 8455
-results_file = 'activeDrag_mach_cd_Comp.xlsx'
+DT = 0.1
+TARGET_APOGEE = 8455
+RESULTS_FILENAME = 'activeDrag_mach_cd_Comp.xlsx'
 
 display_plots = True
 
-cd_base  = pd.read_excel(results_file, skiprows=8, nrows=11, usecols='D')['Cd'].tolist()
-cd_fb50  = pd.read_excel(results_file, skiprows=8, nrows=11, usecols='H')['Cd.1'].tolist()
-cd_fb100 = pd.read_excel(results_file, skiprows=8, nrows=11, usecols='L')['Cd.2'].tolist()
+cd_base  = pd.read_excel(RESULTS_FILENAME, skiprows=8, nrows=11, usecols='D')['Cd'].tolist()
+cd_fb50  = pd.read_excel(RESULTS_FILENAME, skiprows=8, nrows=11, usecols='H')['Cd.1'].tolist()
+cd_fb100 = pd.read_excel(RESULTS_FILENAME, skiprows=8, nrows=11, usecols='L')['Cd.2'].tolist()
 
 cd_fb = np.array([cd_base, cd_fb50, cd_fb100]).transpose()
 
@@ -99,6 +99,9 @@ def deploy_brakes(target_apogee, altitude: float, velocity: float, mass: float, 
     apogee_error = 5
     deploy_time = 3
 
+    if thrust: # don't deploy brakes while burning
+        return 0
+    
     # propogate to apogee (zero velocity)
     while velocity > 0:
         altitude, velocity = runge_kutta(altitude, velocity, mass, thrust, gravity, cd_array, percent_deploy, diameter, dt)
@@ -130,7 +133,6 @@ def run_simulation(cd_array, target_apogee: float, dt: float):
     velocity = [0.0]
     acceleration = [0.0]
     percent_deploy = [0.0]
-    current_deploy_percent = percent_deploy[0]
 
     # Event variables
     deployment_velocity = None
@@ -139,41 +141,32 @@ def run_simulation(cd_array, target_apogee: float, dt: float):
     ### Run to apogee
     while velocity[n] >= 0:
         altitude_current, velocity_current = (altitude[n], velocity[n]) #prev state alt/vel
-        altitude_current, velocity_current = runge_kutta(altitude_current, velocity_current, mass, thrust, gravity, cd_array, current_deploy_percent, diameter, dt) # propogate to next altitude/velocity
+        altitude_current, velocity_current = runge_kutta(altitude_current, velocity_current, mass, thrust, gravity, cd_array, percent_deploy[n-1], diameter, dt) # propogate to next altitude/velocity
         n = n + 1
         time.append(n*dt) 
         altitude.append(altitude_current) #update to new runge kutta altitude
         velocity.append(velocity_current) #update to new velocity
-        acceleration.append(get_acceleration(altitude_current, velocity_current, mass, thrust, gravity, cd_array, current_deploy_percent, diameter))
-        if time[n] > burn_time: #begin after burnout
-            thrust = 0 #turn off motor
-            mass = burnout_mass # remove motor mass
-            if time[n] > (burn_time+1) and velocity_current < 411:
-                if deployment_altitude is None:
-                    deployment_velocity = velocity_current
-                    deployment_altitude = altitude_current
-                    print("Brake Deployment Velocity (FB): {:0.0f}".format(deployment_velocity))
-                    print("Brake Deployment Altitude (FB): {:0.0f}".format(deployment_altitude))
-                percent_deploy.append(deploy_brakes(target_apogee, altitude_current, velocity_current, mass, thrust, gravity, cd_array, current_deploy_percent, diameter, dt)) #determine braking amount
-                current_deploy_percent = percent_deploy[n] # add brake drag to computations
-            else:
-                percent_deploy.append(0) #brakes not deployed before burnout        
-        else:
-            percent_deploy.append(0) #brakes not deployed before burnout
-            percentPropellantRemaining = 1 - (time[n] / burn_time)
-            mass = burnout_mass + (percentPropellantRemaining * propellant_mass)
+        acceleration.append(get_acceleration(altitude_current, velocity_current, mass, thrust, gravity, cd_array, percent_deploy[n-1], diameter))
+        percent_propellant_remaining = max(1 - (time[n] / burn_time), 0)
+        mass = burnout_mass + (percent_propellant_remaining * propellant_mass)
+        thrust = total_impulse / burn_time if percent_propellant_remaining else 0
+        percent_deploy.append(deploy_brakes(target_apogee, altitude_current, velocity_current, mass, thrust, gravity, cd_array, percent_deploy[n-1], diameter, dt)) #determine braking amount   
+        if time[n] > (burn_time+1) and velocity_current < 411 and deployment_altitude is None:
+            deployment_velocity = velocity_current
+            deployment_altitude = altitude_current
+            print("Brake Deployment Velocity (FB): {:0.0f}".format(deployment_velocity))
+            print("Brake Deployment Altitude (FB): {:0.0f}".format(deployment_altitude))
+    
+    return np.array([time, altitude, velocity, acceleration, percent_deploy])
 
-    output = np.array([time, altitude, velocity, acceleration, percent_deploy])
-    return output
-
-base_results = run_simulation(cd_fb, 11000, dt)
-fb_results = run_simulation(cd_fb, target_apogee, dt)
+base_results = run_simulation(cd_fb, 11000, DT)
+fb_results = run_simulation(cd_fb, TARGET_APOGEE, DT)
 
 projected_apogee = base_results[1,-1]
 mach_pts = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
 
 print("Projected Apogee: {:0.0f} m".format(projected_apogee))
-print("Target Apogee: {:0.0f} m".format(target_apogee))
+print("Target Apogee: {:0.0f} m".format(TARGET_APOGEE))
 print("Apogee (FB): {:0.0f} m".format(fb_results[1,-1]))
 
 print("Brake Deployment (FB): {:0.0f}%".format(fb_results[4,-1]))
@@ -195,7 +188,7 @@ if(display_plots):
 
     plt.figure()
     plt.plot([0, base_results[0,-1]], [projected_apogee, projected_apogee], 'k-.')
-    plt.plot([0, base_results[0,-1]], [target_apogee, target_apogee], 'k--')
+    plt.plot([0, base_results[0,-1]], [TARGET_APOGEE, TARGET_APOGEE], 'k--')
     plt.plot(base_results[0,:], base_results[1,:])
 
     plt.plot(fb_results[0,:], fb_results[1,:])
