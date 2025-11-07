@@ -1,18 +1,23 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import json
+import sys
 
-DT = 0.1
-TARGET_APOGEE = 8455
-display_plots = True
+# Reading from stdin to avoid hardcoding a filename, piped output from `cat` preferred
+# cat simconfig.json | python3 apogee_analysis_testCompRocket.py
+CONFIG_DATA = json.loads(sys.stdin.read())
+DT = float(CONFIG_DATA["timestep"])
+TARGET_APOGEE = float(CONFIG_DATA["target_apogee"])
+display_plots = bool(CONFIG_DATA["display_plots"])
 
-cd_base  = [0.528, 0.522, 0.533, 0.548, 0.672, 0.703, 0.706, 0.744, 0.689, 0.644]
-cd_fb = np.array([[0.528, 0.60077879, 0.80919566], [0.522, 0.59698387, 0.81171542], [0.533, 0.61177588, 0.83736663], [0.548, 0.63233372, 0.87384046], [0.672, 0.76391475, 1.02713133], [0.703, 0.80486148, 1.09656255], [0.706, 0.82060962, 1.14881756], [0.744, 0.87469741, 1.24897601], [0.689, 0.83977603, 1.27155384], [0.644, 0.81962075, 1.32254646]])
+cd_base: list[float]  = CONFIG_DATA["cd_data"]["0"]
+cd_fb = np.array([CONFIG_DATA["cd_data"]["0"], CONFIG_DATA["cd_data"]["50"], CONFIG_DATA["cd_data"]["100"]]).transpose()
 
 
 def cd_interp(cd_array, velocity, percent_deploy: float):
     sound_speed = 340
     mach_num = velocity/sound_speed
-    mach_pts = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
+    mach_pts = CONFIG_DATA["cd_data"]["mach_numbers"]
     deploy_pts = [0, 33, 100] # airbrakes off, half, or all on
     i, j = 0, 0
     # Find closest mach point
@@ -89,8 +94,8 @@ def runge_kutta(altitude: float, velocity: float, mass: float, thrust: float, gr
     )
 
 def deploy_brakes(target_apogee, altitude: float, velocity: float, mass: float, thrust: float, gravity: float, cd_array, percent_deploy: float, diameter: float, dt: float):
-    apogee_error = 5
-    deploy_time = 3
+    apogee_error = CONFIG_DATA["apogee_error_m"]
+    deploy_time = CONFIG_DATA["deploy_time_s"]
 
     if thrust: # don't deploy brakes while burning
         return 0
@@ -112,12 +117,12 @@ def deploy_brakes(target_apogee, altitude: float, velocity: float, mass: float, 
 
 def run_simulation(cd_array, target_apogee: float, dt: float):
     ### Setup/initialization
-    mass = 59.95 # kg
-    burnout_mass = 40.62 # kg
+    mass = float(CONFIG_DATA["rocket_total_mass_kg"]) # kg
+    burnout_mass = float(CONFIG_DATA["rocket_burnout_mass_kg"]) # kg
     propellant_mass = mass - burnout_mass # kg
-    diameter = 0.158 # m
-    total_impulse = 39734 # newton seconds
-    burn_time = 9.5 # second
+    diameter = float(CONFIG_DATA["rocket_diameter_m"]) # m
+    total_impulse = float(CONFIG_DATA["total_impulse_ns"]) # newton seconds
+    burn_time = float(CONFIG_DATA["burn_time_s"]) # second
     thrust = total_impulse / burn_time # avg thrust
     gravity = 9.80665 # m/s/s
     n = 0
@@ -156,7 +161,7 @@ base_results = run_simulation(cd_fb, 11000, DT)
 fb_results = run_simulation(cd_fb, TARGET_APOGEE, DT)
 
 projected_apogee = base_results[1,-1]
-mach_pts = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
+mach_pts = CONFIG_DATA["cd_data"]["mach_numbers"]
 
 print("Projected Apogee: {:0.0f} m".format(projected_apogee))
 print("Target Apogee: {:0.0f} m".format(TARGET_APOGEE))
