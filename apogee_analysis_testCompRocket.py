@@ -1,19 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 
 DT = 0.1
 TARGET_APOGEE = 8455
-RESULTS_FILENAME = 'activeDrag_mach_cd_Comp.xlsx'
-
 display_plots = True
 
-cd_base  = pd.read_excel(RESULTS_FILENAME, skiprows=8, nrows=11, usecols='D')['Cd'].tolist()
-cd_fb50  = pd.read_excel(RESULTS_FILENAME, skiprows=8, nrows=11, usecols='H')['Cd.1'].tolist()
-cd_fb100 = pd.read_excel(RESULTS_FILENAME, skiprows=8, nrows=11, usecols='L')['Cd.2'].tolist()
-
-cd_fb = np.array([cd_base, cd_fb50, cd_fb100]).transpose()
-
+cd_base  = [0.528, 0.522, 0.533, 0.548, 0.672, 0.703, 0.706, 0.744, 0.689, 0.644]
+cd_fb = np.array([[0.528, 0.60077879, 0.80919566], [0.522, 0.59698387, 0.81171542], [0.533, 0.61177588, 0.83736663], [0.548, 0.63233372, 0.87384046], [0.672, 0.76391475, 1.02713133], [0.703, 0.80486148, 1.09656255], [0.706, 0.82060962, 1.14881756], [0.744, 0.87469741, 1.24897601], [0.689, 0.83977603, 1.27155384], [0.644, 0.81962075, 1.32254646]])
 
 
 def cd_interp(cd_array, velocity, percent_deploy: float):
