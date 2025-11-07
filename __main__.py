@@ -4,7 +4,7 @@ import json
 import sys
 
 # Reading from stdin to avoid hardcoding a filename, piped output from `cat` preferred
-# cat simconfig.json | python3 apogee_analysis_testCompRocket.py
+# cat simconfig.json | python3 .
 CONFIG_DATA = json.loads(sys.stdin.read())
 DT = float(CONFIG_DATA["timestep"])
 TARGET_APOGEE = float(CONFIG_DATA["target_apogee"])
