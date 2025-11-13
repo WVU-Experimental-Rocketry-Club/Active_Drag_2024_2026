@@ -1,3 +1,13 @@
+'''
+Active Drag Flight Simulation
+Simulates sounding rocket flight with active airbrake control to hit a precise target altitude
+
+Sim uses: 
+    4th order Runge-Kutta integration for flight dynamics
+    Bilinear interpolation for drag coeff calculation
+    Proportional control for airbrake deployment
+    
+'''
 import matplotlib.pyplot as plt
 import numpy as np
 import json
@@ -21,50 +31,68 @@ def cd_interp(cd_array, velocity, percent_deploy: float):
     deploy_pts = [0, 33, 100] # airbrakes off, half, or all on
     i, j = 0, 0
     # Find closest mach point
-    for mach_val in mach_pts: 
+    for mach_val in mach_pts: # loops through mach pts until it finds val higher than current mach pt
         if mach_val > mach_num:
             i = mach_pts.index(mach_val) - 1
             break
         else:
-            i = len(mach_pts) - 1
+            i = len(mach_pts) - 1 # handles edge cases above mach 2.0 (extrapolates)
     # Find closest deploy val
-    for deploy_val in deploy_pts:
+    for deploy_val in deploy_pts: # loop to make sure breaks deploy at correct value based on mach
         if deploy_val > percent_deploy:
             j = deploy_pts.index(deploy_val) - 1
             break
-        else:
-            j = len(deploy_pts) - 2
+        else: 
+            j = len(deploy_pts) - 2 # bounds checker
     
-    if (i == -1) or (i == len(mach_pts)-1): #if smallest or largest mach value
+    if (i == -1) or (i == len(mach_pts)-1): # if slower than mach 0.2 or faster than 2.0, don't interpolate
         if i == -1:
             i = 0
-        f1 = cd_array[i,j] #mach, closest smaller deploy value
-        f2 = cd_array[i,j+1] #mach, closest greater deploy value
+        f1 = cd_array[i,j] # mach, closest smaller deploy value
+        f2 = cd_array[i,j+1] # mach, closest greater deploy value
+    # interpolation
     else:
-        f1 = (mach_pts[i+1] - mach_num)/(mach_pts[i+1] - mach_pts[i])*cd_array[i,j] + (mach_num - mach_pts[i])/(mach_pts[i+1] - mach_pts[i])*cd_array[i+1,j]
-        f2 = (mach_pts[i+1] - mach_num)/(mach_pts[i+1] - mach_pts[i])*cd_array[i,j+1] + (mach_num - mach_pts[i])/(mach_pts[i+1] - mach_pts[i])*cd_array[i+1,j+1]
+        f1 = (mach_pts[i+1] - mach_num)/(mach_pts[i+1] - mach_pts[i])*cd_array[i,j] + (mach_num - mach_pts[i])/(mach_pts[i+1] - mach_pts[i])*cd_array[i+1,j] # weight and drag coeff for lower mach point
+        f2 = (mach_pts[i+1] - mach_num)/(mach_pts[i+1] - mach_pts[i])*cd_array[i,j+1] + (mach_num - mach_pts[i])/(mach_pts[i+1] - mach_pts[i])*cd_array[i+1,j+1] # weight and drag coeff for upper mach point
     # interpolate CD values
     cd = (deploy_pts[j+1] - percent_deploy)/(deploy_pts[j+1] - deploy_pts[j])*f1 + (percent_deploy - deploy_pts[j])/(deploy_pts[j+1] - deploy_pts[j])*f2
     return cd
+'''
+    Noah's comments for above section:
+    Sound speed MIGHT be too oversimplified since it doesn't account for altitude (but i'm a cs major so it could be negligible for all i know?)
+    No bounds checking for if percent_deploy is negative or >100% (could cause array indexing errors)
+    Extrapolation beyond 2.0 or 0.2 is scary but when the hell would this thing ever be deploying before mach .2, or after mach 2? 
+    
+    by the end of function call 
+    Velocity converted to mach number
+    found appropriate data brackets in both mach and deployment dimensions
+    performed bilinear interpolation to estimate drag coefficient
+    returned a cd value for use in drag force calculation
+'''
 
+# Calculates air density at any altitude using standard atmosphere model
 def get_atmosphere_density(altitude: float) -> float:
-    rho_b = 1.2250
-    Tb = 288.15
-    Lb = 0.0065
-    hb = 0
-    g0 = 9.80665
-    R = 8.3144598
-    M = 0.0289644
+
+    rho_b = 1.2250 # air density at sea level
+    Tb = 288.15 # International Standard Atmosphere value (ISA)
+    Lb = 0.0065 # Temp lapse rate in K/m (6.5 degree C per 1000m) Basically how fast temp drops with altitude
+    hb = 0 # reference altitude in meters
+    g0 = 9.80665 # gravitational acceleration in m/s^2 (assumes constant grav)
+    R = 8.3144598 # Universal gas constant in j/(mol*K)
+    M = 0.0289644 # Molar mass of air in kg/mol (doesn't account for humidity)
     h = altitude
-    rho = rho_b*((Tb - (h - hb)*Lb)/Tb)**((g0*M)/(R*Lb) - 1)
+    rho = rho_b*((Tb - (h - hb)*Lb)/Tb)**((g0*M)/(R*Lb) - 1) # barometric forumla for tropospheric conditions
     return rho
 
-def get_drag(cd_array, velocity: float, percent_deploy: float, altitude: float, diameter: float) -> float:
-    V = velocity
-    A = np.pi*(diameter/2)**2
-    rho = get_atmosphere_density(altitude)
-    cd = cd_interp(cd_array, velocity, percent_deploy)
-    drag = 1/2*rho*V**2*cd*A
+
+# Calculates total drag force acting on rocket using standard drag equation
+def get_drag(cd_array, velocity, percent_deploy, altitude, diameter):
+    V = velocity # velocity in m/s
+    A = np.pi*(diameter/2)**2 # rocket cross-sectional area in m^2 (area of circle = pi * radius^2)
+    rho = get_atmosphere_density(altitude) # Get air density at current altitude
+    cd = cd_interp(cd_array, velocity, percent_deploy) # Gets drag coeff via interpolation (interp function from above)
+    drag = 1/2*rho*V**2*cd*A # standard aerodynamic drag equation 
+
     return drag
 
 def get_acceleration(altitude: float, velocity: float, mass: float, thrust: float, gravity: float, cd_array, percent_deploy: float, diameter: float) -> float:
