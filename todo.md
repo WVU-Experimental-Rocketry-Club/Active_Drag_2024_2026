@@ -1,0 +1,12 @@
+- Separate the code into files
+- Main simulation loop converted into a state machine (flight phases)
+    - Split out boost, coast, airbrake active
+- Convert data files to JSON, CSV, .eng
+- Config files to change between 4" test and 6" test
+- Readme files for each subsection of the code
+- New file to implement flight computer logic outside of the main loop
+    - Rely on just the data we can ingest from the GPS
+- Implement weather files from balloon data
+- Change mach number to be relative to altitude
+- Ingest old telemega/blue raven data to test predictions
+- 
