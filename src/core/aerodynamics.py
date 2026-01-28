@@ -71,8 +71,7 @@ import time as timer
 #     drag = 1/2*rho*V**2*cd*A
 #     return drag
 
-def getTotalDrag(cd_array, velocity, percent_deploy, altitude, diameter):
-    brakeFaceArea = 0.015483871 # m^2 for total airbrake area
+def getTotalDrag(cd_array, velocity, percent_deploy, altitude, diameter, brakeFaceArea):
     pressure = atm_pressure(altitude) # ps
     rho = atm_density(altitude) # p
     gamma = 1.4  # Ratio of specific heats for air
@@ -91,8 +90,7 @@ def getTotalDrag(cd_array, velocity, percent_deploy, altitude, diameter):
     totalDrag = FbrakeDrag + FrocketDrag
     return totalDrag
 
-def getBrakeDrag(cd_array, velocity, percent_deploy, altitude, diameter):
-    brakeFaceArea = 0.015483871 # m^2 for total airbrake area
+def getBrakeDrag(cd_array, velocity, percent_deploy, altitude, brakeFaceArea):
     pressure = atm_pressure(altitude) # ps
     rho = atm_density(altitude) # p
     gamma = 1.4  # Ratio of specific heats for air
@@ -106,11 +104,11 @@ def getBrakeDrag(cd_array, velocity, percent_deploy, altitude, diameter):
 
     return FbrakeDrag
 
-def getRocketBodyDrag(cd_array, velocity, percent_deploy, altitude, diameter):
+def getRocketBodyDrag(cd_array, velocity, altitude, diameter):
     rho = atm_density(altitude) # p
     c = (speed_of_sound(altitude))
     mach_num = velocity/c
-    
+
     Arocket = np.pi*(diameter/2)**2
     Rocketdrag = np.interp(mach_num, cd_array['Mach'], cd_array['CD'])
     FrocketDrag = 0.5 * rho * velocity**2 * Rocketdrag * Arocket

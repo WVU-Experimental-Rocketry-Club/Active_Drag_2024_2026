@@ -66,7 +66,8 @@ def get_acceleration(state, accel_consts, drag_args):
     cd_array = drag_args[0]
     percent_deploy = drag_args[1]
     diameter = drag_args[2]
-    drag = getTotalDrag(cd_array, velocity, percent_deploy, altitude, diameter)
+    brakefacearea = drag_args[3]
+    drag = getTotalDrag(cd_array, velocity, percent_deploy, altitude, diameter, brakefacearea)
     acceleration = -drag/mass - gravity
     return acceleration
 
@@ -77,7 +78,7 @@ def get_acceleration_2d(state, accel_consts, drag_args):
     Args:
         state: [altitude, vertical_velocity, horizontal_distance, horizontal_velocity]
         accel_consts: [mass, thrust, gravity]
-        drag_args: [cd_array, percent_deploy, diameter]
+        drag_args: [cd_array, percent_deploy, diameter, brakefacearea]
         
     Returns:
         [ax, ay]
@@ -92,7 +93,7 @@ def get_acceleration_2d(state, accel_consts, drag_args):
     cd_array = drag_args[0]
     percent_deploy = drag_args[1]
     diameter = drag_args[2]
-    
+    brakefacearea = drag_args[3]
     # Total velocity magnitude
     v_total = np.sqrt(vx**2 + vy**2)
     
@@ -101,7 +102,7 @@ def get_acceleration_2d(state, accel_consts, drag_args):
         return [0.0, thrust / mass - gravity]
     
     # Drag force magnitude
-    drag_force = getTotalDrag(cd_array, v_total, percent_deploy, altitude, diameter)
+    drag_force = getTotalDrag(cd_array, v_total, percent_deploy, altitude, diameter, brakefacearea)
     
     # Drag components (opposes velocity direction)
     # Negative because drag opposes motion
@@ -128,8 +129,8 @@ def get_acceleration_1d(state, accel_consts, drag_args):
     cd_array = drag_args[0]
     percent_deploy = drag_args[1]
     diameter = drag_args[2]
-    
-    drag = getTotalDrag(cd_array, abs(vy), percent_deploy, altitude, diameter)
+    brakefacearea = drag_args[3]
+    drag = getTotalDrag(cd_array, abs(vy), percent_deploy, altitude, diameter, brakefacearea)
     acceleration = (thrust - drag) / mass - gravity
     
     return acceleration
