@@ -84,66 +84,175 @@ def runge_kutta(state, accel_consts, drag_args, dt):
 
     return state
 
-def run_simulation(rocketConfig, cd_array, airbrakes_enabled):
-    ### Setup/initialization
-    dt = rocketConfig["simulation_parameters"]["time_step"] # seconds
+def runge_kutta_2d(state, accel_consts, drag_args, dt):
+    """
+    Propagates 2D rocket state forward by dt seconds using 4th order Runge Kutta.
+    
+    State: [altitude, vy, horizontal_distance, vx]
+    Derivatives: [vy, ay, vx, ax]
+    
+    Args:
+        state: [y, vy, x, vx]
+        accel_consts: [mass, thrust, gravity]
+        drag_args: [cd_array, percent_deploy, diameter]
+        dt: timestep
+        
+    Returns:
+        Updated state [y, vy, x, vx]
+    """
+    y = state[0]
+    vy = state[1]
+    x = state[2]
+    vx = state[3]
+    
+    # k1 = f(state_0, t_0)
+    ax1, ay1 = get_acceleration_2d(state, accel_consts, drag_args)
+    k1 = [vy, ay1, vx, ax1]
+    
+    # k2 = f(state_0 + k1*dt/2, t_0 + dt/2)
+    state_k1 = [
+        y + 0.5 * k1[0] * dt,
+        vy + 0.5 * k1[1] * dt,
+        x + 0.5 * k1[2] * dt,
+        vx + 0.5 * k1[3] * dt
+    ]
+    ax2, ay2 = get_acceleration_2d(state_k1, accel_consts, drag_args)
+    k2 = [state_k1[1], ay2, state_k1[3], ax2]
+    
+    # k3 = f(state_0 + k2*dt/2, t_0 + dt/2)
+    state_k2 = [
+        y + 0.5 * k2[0] * dt,
+        vy + 0.5 * k2[1] * dt,
+        x + 0.5 * k2[2] * dt,
+        vx + 0.5 * k2[3] * dt
+    ]
+    ax3, ay3 = get_acceleration_2d(state_k2, accel_consts, drag_args)
+    k3 = [state_k2[1], ay3, state_k2[3], ax3]
+    
+    # k4 = f(state_0 + k3*dt, t_0 + dt)
+    state_k3 = [
+        y + k3[0] * dt,
+        vy + k3[1] * dt,
+        x + k3[2] * dt,
+        vx + k3[3] * dt
+    ]
+    ax4, ay4 = get_acceleration_2d(state_k3, accel_consts, drag_args)
+    k4 = [state_k3[1], ay4, state_k3[3], ax4]
+    
+    # Combine: state_new = state_0 + (1/6)*(k1 + 2*k2 + 2*k3 + k4)*dt
+    y_new = y + (1/6) * (k1[0] + 2*k2[0] + 2*k3[0] + k4[0]) * dt
+    vy_new = vy + (1/6) * (k1[1] + 2*k2[1] + 2*k3[1] + k4[1]) * dt
+    x_new = x + (1/6) * (k1[2] + 2*k2[2] + 2*k3[2] + k4[2]) * dt
+    vx_new = vx + (1/6) * (k1[3] + 2*k2[3] + 2*k3[3] + k4[3]) * dt
+    
+    return [y_new, vy_new, x_new, vx_new]
 
-    target_apogee_AGL = rocketConfig["active_drag_system"]["target_apogee_AGL"] # meters
-    ground_level = rocketConfig["simulation_parameters"]["launch_altitude"] # meters
+
+def run_simulation(rocketConfig, cd_array, airbrakes_enabled, use_2d=True):
+    """
+    Args:
+        use_2d: If True, use 2D simulation; if False, use 1D
+    """
+    dt = rocketConfig["simulation_parameters"]["time_step"]
+    target_apogee_AGL = rocketConfig["active_drag_system"]["target_apogee_AGL"]
+    ground_level = rocketConfig["simulation_parameters"]["launch_altitude"]
     target_apogee = ground_level + target_apogee_AGL
-    airbrake_controller = AirbrakeController(target_apogee, rocketConfig, {'airbrakeMachThreshold': 1.45})
-
-    burnout_time = rocketConfig["simulation_parameters"]["burnout_time"] # seconds
-    burnout_verticalVelocity = rocketConfig["simulation_parameters"]["burnout_verticalVelocity"] # m/s
-    burnout_horizontalVelocity = rocketConfig["simulation_parameters"]["burnout_horizontalVelocity"] # m/s
-    burnout_altitude = rocketConfig["simulation_parameters"]["burnout_altitude"] # meters
-
-    burnout_mass = rocketConfig["mass_properties"]["burnout_mass"] # kg
-    diameter = rocketConfig["dimensions"]["diameter"] # m
-
-    gravity = 9.80665 # m/s/s
-
+    
+    airbrake_controller = AirbrakeController(target_apogee, rocketConfig)
+    
+    burnout_time = rocketConfig["simulation_parameters"]["burnout_time"]
+    burnout_vy = rocketConfig["simulation_parameters"]["burnout_verticalVelocity"]
+    burnout_vx = rocketConfig["simulation_parameters"]["burnout_horizontalVelocity"]
+    burnout_altitude = rocketConfig["simulation_parameters"]["burnout_altitude"]
+    
+    burnout_mass = rocketConfig["mass_properties"]["burnout_mass"]
+    diameter = rocketConfig["dimensions"]["diameter"]
+    gravity = 9.80665
+    
     n = 0
-    time = [burnout_time]
+    time_array = [burnout_time]
     altitude = [burnout_altitude]
-    velocity = [burnout_verticalVelocity]
+    vy_array = [burnout_vy]
+    vx_array = [burnout_vx] if use_2d else None
+    x_array = [0] if use_2d else None
     acceleration = [0]
     percent_deploy = [0]
-    accel_consts = [burnout_mass, gravity]
-    drag_args = [cd_array, percent_deploy[0], diameter]
-
-    # Event variables
-    deploymentVelocity = 0
-    deploymentAltitude = 0
+    
+    accel_consts = [burnout_mass, 0, gravity]  # thrust = 0 after burnout
+    drag_args = [cd_array, 0, diameter]
+    
     deployment_started = False
-
-    ### Run to apogee
-    while velocity[n] >= 0:
+    
+    ### Simulation loop
+    if use_2d:
+        # 2D simulation
+        state = [burnout_altitude, burnout_vy, 0, burnout_vx]
         
-        ### Propogate state by dt
-        state = [altitude[n], velocity[n]] #prev state alt/vel
-        state = runge_kutta(state, accel_consts, drag_args, dt) # propogate to next altitude/velocity
-        n = n + 1
-        time.append(n*dt + burnout_time) 
-        altitude.append(state[0]) #update to new runge kutta altitude
-        velocity.append(state[1]) #update to new velocity
-        acceleration.append(get_acceleration(state, accel_consts, drag_args))
-
-        ### run active drag controller if enabled
-        if airbrakes_enabled:
-            deploymentPercent = airbrake_controller.update(time[n], state, accel_consts, drag_args, dt)
-        else:
-            deploymentPercent = 0
-        percent_deploy.append(deploymentPercent)
-        drag_args[1] = deploymentPercent
-
-        if not deployment_started and deploymentPercent > 0:
-            deployment_started = True
-            deployment_velocity = velocity[n]
-            deployment_altitude = altitude[n]
-            print(f"Brake Deployment Velocity: {deployment_velocity:.0f} m/s")
-            print(f"Brake Deployment Altitude: {deployment_altitude:.0f} m")
-            print(f"Target Apogee: {target_apogee} m")
-
-    output = np.array([time, altitude, velocity, acceleration, percent_deploy])
+        while state[1] >= 0:  # While vy >= 0
+            state = runge_kutta_2d(state, accel_consts, drag_args, dt)
+            
+            n += 1
+            time_array.append(n * dt + burnout_time)
+            altitude.append(state[0])
+            vy_array.append(state[1])
+            x_array.append(state[2])
+            vx_array.append(state[3])
+            
+            v_total = np.sqrt(state[1]**2 + state[3]**2)
+            ax, ay = get_acceleration_2d(state, accel_consts, drag_args)
+            a_total = np.sqrt(ax**2 + ay**2)
+            acceleration.append(ay)
+            
+            # Control
+            if airbrakes_enabled:
+                # For controller, use vertical velocity state
+                deploymentPercent = airbrake_controller.update(
+                    time_array[n], state, accel_consts, drag_args, dt
+                )
+            else:
+                deploymentPercent = 0
+            
+            percent_deploy.append(deploymentPercent)
+            drag_args[1] = deploymentPercent
+            
+            if not deployment_started and deploymentPercent > 0:
+                deployment_started = True
+                print(f"\n\n--- Airbrake Deployment Initiated ---")
+                print(f"Brake Deployment Velocity (vertical): {state[1]:.0f} m/s")
+                print(f"Brake Deployment Velocity (horizontal): {state[3]:.0f} m/s")
+                print(f"Brake Deployment Altitude: {state[0]:.0f} m")
+                print(f"--------------------------------------\n\n")
+        
+        output = np.array([time_array, altitude, vy_array, vx_array, x_array, acceleration, percent_deploy])
+    else:
+        # 1D simulation (vertical only)
+        state = [burnout_altitude, burnout_vy]
+        
+        while state[1] >= 0:
+            state = runge_kutta(state, accel_consts, drag_args, dt)
+            
+            n += 1
+            time_array.append(n * dt + burnout_time)
+            altitude.append(state[0])
+            vy_array.append(state[1])
+            acceleration.append(get_acceleration_1d(state, accel_consts, drag_args))
+            
+            # Control
+            if airbrakes_enabled:
+                deploymentPercent = airbrake_controller.update(
+                    time_array[n], state, accel_consts, drag_args, dt
+                )
+            else:
+                deploymentPercent = 0
+            
+            percent_deploy.append(deploymentPercent)
+            drag_args[1] = deploymentPercent
+            
+            if not deployment_started and deploymentPercent > 0:
+                deployment_started = True
+                print(f"Brake Deployment Velocity: {state[1]:.0f} m/s")
+                print(f"Brake Deployment Altitude: {state[0]:.0f} m")
+        
+        output = np.array([time_array, altitude, vy_array, acceleration, percent_deploy])
+    
     return output

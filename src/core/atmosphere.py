@@ -48,7 +48,7 @@ def load_weather_data(weather_data):
         _weather_data = pd.read_csv(weather_data)
     
     _use_weather = True
-    print(f"Loaded weather data with {len(_weather_data)} altitude points")
+    # print(f"Loaded weather data with {len(_weather_data)} altitude points")
 
 def use_isa_model():
     """Switch back to ISA standard atmosphere"""

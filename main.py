@@ -178,49 +178,41 @@ class SimulationRunner:
         target_apogee_AGL = self.config["active_drag_system"]["target_apogee_AGL"] # meters
         ground_level = self.config["simulation_parameters"]["launch_altitude"] # meters
         target_apogee = ground_level + target_apogee_AGL
+        fig, axs = plt.subplots(2, 2, figsize=(14, 10))
+        axs[0, 0].plot([0, self.results['baseline'][0,-1]], [self.results['baseline'][1,-1], self.results['baseline'][1,-1]], 'k-.')
+        axs[0, 0].plot([0, self.results['baseline'][0,-1]], [target_apogee, target_apogee], 'k--')
+        axs[0, 0].plot(self.results['baseline'][0,:], self.results['baseline'][1,:])
+        axs[0, 0].plot(self.results['active_drag'][0,:], self.results['active_drag'][1,:])
+        axs[0, 0].set_title("Altitude")
+        axs[0, 0].set_xlabel("Time (s)")
+        axs[0, 0].set_ylabel("Altitude (m)")
+        axs[0, 0].legend(["Projected Apogee","Target Apogee", "Base", "FB"])
+        axs[0, 0].grid()
 
-        plt.figure()
-        plt.plot([0, self.results['baseline'][0,-1]], [self.results['baseline'][1,-1], self.results['baseline'][1,-1]], 'k-.')
-        plt.plot([0, self.results['baseline'][0,-1]], [target_apogee, target_apogee], 'k--')
-        plt.plot(self.results['baseline'][0,:], self.results['baseline'][1,:])
+        axs[0, 1].plot(self.results['baseline'][0,:], self.results['baseline'][2,:])
+        axs[0, 1].plot(self.results['active_drag'][0,:], self.results['active_drag'][2,:])
+        axs[0, 1].set_title("Velocity")
+        axs[0, 1].set_xlabel("Time (s)")
+        axs[0, 1].set_ylabel("Velocity (m/s)")
+        axs[0, 1].legend(["Base", "FB"])
+        axs[0, 1].grid()
 
-        plt.plot(self.results['active_drag'][0,:], self.results['active_drag'][1,:])
+        axs[1, 0].plot(self.results['baseline'][0,:], self.results['baseline'][5,:])
+        axs[1, 0].plot(self.results['active_drag'][0,:], self.results['active_drag'][5,:])
+        axs[1, 0].set_title("Acceleration")
+        axs[1, 0].set_xlabel("Time (s)")
+        axs[1, 0].set_ylabel("Acceleration (m/s^2)")
+        axs[1, 0].legend(["Base", "FB"])
+        axs[1, 0].grid()
 
-        plt.title("Altitude")
-        plt.xlabel("Time (s)")
-        plt.ylabel("Altitude (m)")
-        plt.legend(["Projected Apogee","Target Apogee", "Base", "FB"])
-        plt.grid()
-
-        plt.figure()
-        plt.plot(self.results['baseline'][0,:], self.results['baseline'][2,:])
-        plt.plot(self.results['active_drag'][0,:], self.results['active_drag'][2,:])
-
-        plt.title("Velocity")
-        plt.xlabel("Time (s)")
-        plt.ylabel("Velocity (m/s)")
-        plt.legend(["Base", "FB"])
-        plt.grid()
-
-        plt.figure()
-        plt.plot(self.results['baseline'][0,:], self.results['baseline'][3,:])
-        plt.plot(self.results['active_drag'][0,:], self.results['active_drag'][3,:])
-        plt.title("Acceleration")
-        plt.xlabel("Time (s)")
-        plt.ylabel("Acceleration (m/s^2)")
-        plt.legend(["Base", "FB"])
-        plt.grid()
-
-        plt.figure()
-        plt.plot(self.results['baseline'][0,:], self.results['baseline'][4,:], label="_nolegend_")
-        plt.plot(self.results['active_drag'][0,:], self.results['active_drag'][4,:])
-        plt.title("Brake Deployment")
-        plt.xlabel("Time (s)")
-        plt.ylabel("Brake Deployment (%)")
-        plt.legend(["FB"])
-        plt.ylim([-10, 110])
-        plt.grid()
-
+        axs[1, 1].plot(self.results['baseline'][0,:], self.results['baseline'][6,:], label="_nolegend_")
+        axs[1, 1].plot(self.results['active_drag'][0,:], self.results['active_drag'][6,:])
+        axs[1, 1].set_title("Brake Deployment")
+        axs[1, 1].set_xlabel("Time (s)")
+        axs[1, 1].set_ylabel("Brake Deployment (%)")
+        axs[1, 1].legend(["FB"])
+        axs[1, 1].set_ylim([-10, 110])
+        axs[1, 1].grid()
         plt.show()
         
     
@@ -234,12 +226,14 @@ class SimulationRunner:
         # - Burnout velocity
         # - Apogee prediction accuracy
         # - Deployment statistics (max, mean, time spent deployed)
-        print("Projected Apogee: {:0.0f} m".format(self.results['baseline'][1,-1]))
-        print("Target Apogee: {:0.0f} m".format(self.config["simulation_parameters"]["launch_altitude"] + self.config["active_drag_system"]["target_apogee_AGL"]))
-        print("Apogee (FB): {:0.0f} m".format(self.results['active_drag'][1,-1]))
+        print("Projected Apogee: {:0.0f} m ({:0.0f} m AGL)".format(self.results['baseline'][1,-1], self.results['baseline'][1,-1] - self.config["simulation_parameters"]["launch_altitude"]))
+        print("Target Apogee: {:0.0f} m ({:0.0f} m AGL)".format(self.config["simulation_parameters"]["launch_altitude"] + self.config["active_drag_system"]["target_apogee_AGL"], self.config["active_drag_system"]["target_apogee_AGL"]))
+        print("Apogee With Airbrakes (ASL): {:0.0f} m".format(self.results['active_drag'][1,-1]))
+        print("Apogee With Airbrakes (AGL): {:0.0f} m".format(self.results['active_drag'][1,-1] - self.config["simulation_parameters"]["launch_altitude"]))
         print("Apogee Reduction (FB): {:0.0f} m".format(self.results['baseline'][1,-1] - self.results['active_drag'][1,-1]))
+        print("Apogee Error: {:0.0f} m".format(self.results['active_drag'][1,-1] - (self.config["simulation_parameters"]["launch_altitude"] + self.config["active_drag_system"]["target_apogee_AGL"])))
 
-        print("Brake Deployment (FB): {:0.0f}%".format(self.results['active_drag'][4,-1]))
+        print("Brake Deployment (FB): {:0.0f}%".format(self.results['active_drag'][6,-1]))
 
         
     
@@ -267,12 +261,14 @@ class SimulationRunner:
         
         print("Exporting results...")
         self.export_results()
-        
+
+        self.print_summary()
+
         if plot:
             print("Generating plots...")
             self.plot_results()
         
-        self.print_summary()
+
         
         return self.results
 

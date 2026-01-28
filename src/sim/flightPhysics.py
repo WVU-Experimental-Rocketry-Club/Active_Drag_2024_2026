@@ -69,3 +69,67 @@ def get_acceleration(state, accel_consts, drag_args):
     drag = getTotalDrag(cd_array, velocity, percent_deploy, altitude, diameter)
     acceleration = -drag/mass - gravity
     return acceleration
+
+def get_acceleration_2d(state, accel_consts, drag_args):
+    """
+    Calculate 2D accelerations [ax, ay] from forces.
+    
+    Args:
+        state: [altitude, vertical_velocity, horizontal_distance, horizontal_velocity]
+        accel_consts: [mass, thrust, gravity]
+        drag_args: [cd_array, percent_deploy, diameter]
+        
+    Returns:
+        [ax, ay]
+    """
+    altitude = state[0]
+    vy = state[1]
+    vx = state[3]
+    
+    mass = accel_consts[0]
+    thrust = accel_consts[1]
+    gravity = accel_consts[2]
+    cd_array = drag_args[0]
+    percent_deploy = drag_args[1]
+    diameter = drag_args[2]
+    
+    # Total velocity magnitude
+    v_total = np.sqrt(vx**2 + vy**2)
+    
+    # Avoid division by zero
+    if v_total < 0.01:
+        return [0.0, thrust / mass - gravity]
+    
+    # Drag force magnitude
+    drag_force = getTotalDrag(cd_array, v_total, percent_deploy, altitude, diameter)
+    
+    # Drag components (opposes velocity direction)
+    # Negative because drag opposes motion
+    drag_x = -drag_force * (vx / v_total)
+    drag_y = -drag_force * (vy / v_total)
+    
+    # Accelerations
+    ax = drag_x / mass
+    ay = (thrust + drag_y) / mass - gravity
+    
+    return [ax, ay]
+
+
+def get_acceleration_1d(state, accel_consts, drag_args):
+    """
+    Calculate 1D vertical acceleration (existing function, keep for compatibility).
+    """
+    altitude = state[0]
+    vy = state[1]
+    
+    mass = accel_consts[0]
+    thrust = accel_consts[1]
+    gravity = accel_consts[2]
+    cd_array = drag_args[0]
+    percent_deploy = drag_args[1]
+    diameter = drag_args[2]
+    
+    drag = getTotalDrag(cd_array, abs(vy), percent_deploy, altitude, diameter)
+    acceleration = (thrust - drag) / mass - gravity
+    
+    return acceleration
