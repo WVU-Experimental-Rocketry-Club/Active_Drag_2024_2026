@@ -139,9 +139,3 @@ def run_simulation(cd_array, target_apogee, dt):
 
     output = np.array([time, altitude, velocity, acceleration, percent_deploy])
     return output
-
-# base_results = run_simulation(cd_fb, 11000, dt)
-# fb_results = run_simulation(cd_fb, target_apogee, dt)
-
-# projected_apogee = base_results[1,-1]
-# mach_pts = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]

@@ -228,7 +228,7 @@ class SimulationRunner:
         # - Apogee prediction accuracy
         # - Deployment statistics (max, mean, time spent deployed)
         print("Projected Apogee: {:0.0f} m".format(self.results['baseline'][1,-1]))
-        print("Target Apogee: {:0.0f} m".format(8000))
+        print("Target Apogee: {:0.0f} m".format(self.config["simulation_parameters"]["launch_altitude"] + self.config["active_drag_system"]["target_apogee_AGL"]))
         print("Apogee (FB): {:0.0f} m".format(self.results['active_drag'][1,-1]))
         print("Apogee Reduction (FB): {:0.0f} m".format(self.results['baseline'][1,-1] - self.results['active_drag'][1,-1]))
 
@@ -278,7 +278,7 @@ def main():
     parser.add_argument(
         '--config', 
         type=str, 
-        default='configs/competition_rocket_activedrag.json',
+        default='configs/competition_rocket_2026.json',
         help='Path to configuration JSON file'
     )
     parser.add_argument(
