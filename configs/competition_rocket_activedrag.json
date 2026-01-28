@@ -1,0 +1,46 @@
+{
+    "rocket_name": "Competition Rocket - ActiveDrag",
+    "description": "WVU Competition rocket with ActiveDrag system based on original analysis",
+    "dimensions": {
+        "length": 3.5,
+        "diameter": 0.158,
+        "fin_span": 0.3,
+        "nose_cone_length": 0.4
+    },
+    "mass_properties": {
+        "dry_mass": 40.62,
+        "propellant_mass": 19.33,
+        "center_of_gravity": 1.8,
+        "center_of_pressure": 2.1
+    },
+    "file_paths": {
+        "motor_file": "data/motors/competition_motor.csv",
+        "aero_file": "data/aero/competition_drag_profile.csv"
+    },
+    "simulation_parameters": {
+        "time_step": 0.1,
+        "max_simulation_time": 300,
+        "launch_angle": 90,
+        "launch_altitude": 0,
+        "wind_speed": 0.0,
+        "wind_direction": 0,
+        "burn_time": 9.5
+    },
+    "motor_parameters": {
+        "total_impulse": 39734,
+        "burn_time": 9.5,
+        "average_thrust": 4182.5
+    },
+    "active_drag_system": {
+        "enabled": true,
+        "activation_altitude": 1000,
+        "target_apogee": 8455,
+        "control_frequency": 10,
+        "max_drag_coefficient": 2.5,
+        "min_drag_coefficient": 0.5,
+        "deployment_conditions": {
+            "min_time_after_burnout": 1.0,
+            "max_velocity_for_activation": 411
+        }
+    }
+}
