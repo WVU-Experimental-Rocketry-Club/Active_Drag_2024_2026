@@ -93,6 +93,10 @@ class SimulationRunner:
             output_dir (str or Path): Directory for output files
         """
         self.config_path = Path(config_path)
+        with open(self.config_path, 'r') as f:
+            self.rocketConfig = json.load(f)
+
+
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -145,7 +149,7 @@ class SimulationRunner:
             dict: Baseline simulation results
                 {'time': array, 'altitude': array, 'velocity': array, ...}
         """
-        return run_simulation(self.load_aero_data(),15000, 1)
+        return run_simulation(self.rocketConfig, self.load_aero_data(), False)
     
     def run_active_drag_simulation(self):
         """
@@ -156,7 +160,7 @@ class SimulationRunner:
                 {'time': array, 'altitude': array, 'velocity': array, 
                  'deployment': array, 'predicted_apogee': array}
         """
-        return run_simulation(self.load_aero_data(),10515, 0.1)
+        return run_simulation(self.rocketConfig, self.load_aero_data(), True)
         
     
     def plot_results(self, show=True, save=True):
@@ -171,10 +175,13 @@ class SimulationRunner:
         # - Velocity vs Time
         # - Deployment Percentage vs Time
         # - Predicted vs Actual Apogee
+        target_apogee_AGL = self.config["active_drag_system"]["target_apogee_AGL"] # meters
+        ground_level = self.config["simulation_parameters"]["launch_altitude"] # meters
+        target_apogee = ground_level + target_apogee_AGL
 
         plt.figure()
         plt.plot([0, self.results['baseline'][0,-1]], [self.results['baseline'][1,-1], self.results['baseline'][1,-1]], 'k-.')
-        plt.plot([0, self.results['baseline'][0,-1]], [10515, 10515], 'k--')
+        plt.plot([0, self.results['baseline'][0,-1]], [target_apogee, target_apogee], 'k--')
         plt.plot(self.results['baseline'][0,:], self.results['baseline'][1,:])
 
         plt.plot(self.results['active_drag'][0,:], self.results['active_drag'][1,:])
@@ -211,7 +218,7 @@ class SimulationRunner:
         plt.xlabel("Time (s)")
         plt.ylabel("Brake Deployment (%)")
         plt.legend(["FB"])
-        plt.ylim([0, 100])
+        plt.ylim([-10, 110])
         plt.grid()
 
         plt.show()
