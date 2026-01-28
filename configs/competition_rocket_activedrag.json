@@ -1,6 +1,6 @@
 {
-    "rocket_name": "Competition Rocket - ActiveDrag",
-    "description": "WVU Competition rocket with ActiveDrag system based on original analysis",
+    "rocket_name": "WVU IREC 2026 Rocket",
+    "description": "WVU Competition rocket with ActiveDrag system for 2026 IREC",
     "dimensions": {
         "length": 3.5,
         "diameter": 0.158,
@@ -8,39 +8,30 @@
         "nose_cone_length": 0.4
     },
     "mass_properties": {
-        "dry_mass": 40.62,
-        "propellant_mass": 19.33,
-        "center_of_gravity": 1.8,
-        "center_of_pressure": 2.1
+        "burnout_mass": 35.87
     },
     "file_paths": {
-        "motor_file": "data/motors/competition_motor.csv",
         "aero_file": "data/aero/competition_drag_profile.csv"
     },
     "simulation_parameters": {
         "time_step": 0.1,
         "max_simulation_time": 300,
-        "launch_angle": 90,
-        "launch_altitude": 0,
-        "wind_speed": 0.0,
-        "wind_direction": 0,
-        "burn_time": 9.5
-    },
-    "motor_parameters": {
-        "total_impulse": 39734,
-        "burn_time": 9.5,
-        "average_thrust": 4182.5
+        "launch_altitude": 893,
+        "burnout_time": 9.901,
+        "burnout_verticalVelocity": 507.79,
+        "burnout_horizontalVelocity": 83.2,
+        "burnout_altitude": 4156.8624
     },
     "active_drag_system": {
         "enabled": true,
-        "activation_altitude": 1000,
-        "target_apogee": 8455,
+        "target_apogee_AGL2": 9144,
+        "target_apogee_AGL": 7000,
         "control_frequency": 10,
-        "max_drag_coefficient": 2.5,
-        "min_drag_coefficient": 0.5,
+        "max_brake_force2": 1112.06,
+        "max_brake_force": 250,
         "deployment_conditions": {
             "min_time_after_burnout": 1.0,
-            "max_velocity_for_activation": 411
+            "maximum_mach": 1.6
         }
     }
 }

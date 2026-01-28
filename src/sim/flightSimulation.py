@@ -84,17 +84,23 @@ def runge_kutta(state, accel_consts, drag_args, dt):
 
     return state
 
-def run_simulation(cd_array, target_apogee, dt):
-
-    airbrake_controller = AirbrakeController(target_apogee, {'airbrakeMachThreshold': 1.45})
+def run_simulation(rocketConfig, cd_array, airbrakes_enabled):
     ### Setup/initialization
-    burnout_time = 9.901 # seconds
-    burnout_verticalVelocity = 507.79 # m/s
-    burnout_horizontalVelocity = 83.2 # m/s
-    burnout_altitude = 4156.8624 # meters
+    dt = rocketConfig["simulation_parameters"]["time_step"] # seconds
 
-    burnout_mass = 40.62 # kg
-    diameter = 0.158 # m
+    target_apogee_AGL = rocketConfig["active_drag_system"]["target_apogee_AGL"] # meters
+    ground_level = rocketConfig["simulation_parameters"]["launch_altitude"] # meters
+    target_apogee = ground_level + target_apogee_AGL
+    airbrake_controller = AirbrakeController(target_apogee, rocketConfig, {'airbrakeMachThreshold': 1.45})
+
+    burnout_time = rocketConfig["simulation_parameters"]["burnout_time"] # seconds
+    burnout_verticalVelocity = rocketConfig["simulation_parameters"]["burnout_verticalVelocity"] # m/s
+    burnout_horizontalVelocity = rocketConfig["simulation_parameters"]["burnout_horizontalVelocity"] # m/s
+    burnout_altitude = rocketConfig["simulation_parameters"]["burnout_altitude"] # meters
+
+    burnout_mass = rocketConfig["mass_properties"]["burnout_mass"] # kg
+    diameter = rocketConfig["dimensions"]["diameter"] # m
+
     gravity = 9.80665 # m/s/s
 
     n = 0
@@ -123,9 +129,11 @@ def run_simulation(cd_array, target_apogee, dt):
         velocity.append(state[1]) #update to new velocity
         acceleration.append(get_acceleration(state, accel_consts, drag_args))
 
-        ### run active drag controller 
-
-        deploymentPercent = airbrake_controller.update(time[n], state, accel_consts, drag_args, dt)
+        ### run active drag controller if enabled
+        if airbrakes_enabled:
+            deploymentPercent = airbrake_controller.update(time[n], state, accel_consts, drag_args, dt)
+        else:
+            deploymentPercent = 0
         percent_deploy.append(deploymentPercent)
         drag_args[1] = deploymentPercent
 

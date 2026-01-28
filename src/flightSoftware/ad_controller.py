@@ -56,12 +56,13 @@ class AirbrakeController:
         control_frequency (float): Controller update rate (Hz)
     """
     
-    def __init__(self, target_apogee, config=None):
+    def __init__(self, target_apogee, rocketConfig, config=None):
         """
         Initialize airbrake controller.
         
         Args:
             target_apogee (float): Target apogee altitude (m)
+            rocketConfig (dict): Rocket configuration parameters
             config (dict, optional): Controller configuration
                 - airbrakeMachThreshold: Maximum mach for deployment (default 2.0)
                 - deployment_time: Time for full deployment (s), default 3.0
@@ -78,6 +79,8 @@ class AirbrakeController:
         self.error_threshold = config.get('error_threshold', 5.0)
         self.control_frequency = config.get('control_frequency', 100.0)
         self.max_deployment = config.get('max_deployment', 100.0)
+        self.kp = config.get('kp', .02)  # Proportional gain
+        self.maxBrakeForece = rocketConfig["active_drag_system"]["max_brake_force"]  # Newtons
         
         # State
         self.current_deployment = 0.0
@@ -105,7 +108,7 @@ class AirbrakeController:
         if time - self.last_update_time < (1.0 / self.control_frequency):
             return self.current_deployment
         if self.target_apogee - state[0] > 1000:
-            self.error_threshold = 25
+            self.error_threshold = 5
             curr_target_apogee = self.target_apogee + 25
             prediction_dt = 1
         else:
@@ -125,11 +128,12 @@ class AirbrakeController:
             # Proportional control: more error = faster deployment change
             # Positive error (too high) → increase deployment (more drag)
             # Negative error (too low) → decrease deployment (less drag)
-            deployment_change = self.deployment_rate * (time - self.last_update_time)
+            deployment_change = self.deployment_rate * (time - self.last_update_time) * min(abs(error) * self.kp, 1.0)
             
             if error > 0:  # Predicted apogee too high
-                self.current_deployment = min(self.current_deployment + deployment_change, 
-                                             self.max_deployment)
+                #only deploy brakes if resulting drag is within max brake force
+                if getBrakeDrag(drag_args[0], state[1], self.current_deployment + deployment_change, state[0], drag_args[2]) < self.maxBrakeForece:
+                    self.current_deployment = min(self.current_deployment + deployment_change, self.max_deployment)
             else:  # Predicted apogee too low
                 self.current_deployment = max(self.current_deployment - deployment_change, 0.0)
         
