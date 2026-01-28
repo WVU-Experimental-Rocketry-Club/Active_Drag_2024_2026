@@ -133,13 +133,16 @@ class SimulationRunner:
         cd_fb100 = pd.read_excel(results_file, skiprows=8, nrows=11, usecols='L')['Cd.2'].tolist()
         self.cd_fb = np.array([cd_base, cd_fb50, cd_fb100]).transpose()
 
+        aero_file = self.config["file_paths"]["aero_file"]
+        self.aero_file = pd.read_csv(aero_file)
+
         # Configure atmosphere module with weather data
         weather_file = 'data/weather/2025_IREC_weather.csv'
         self.weather_data = pd.read_csv(weather_file)
         atmosphere.load_weather_data(self.weather_data)
         # atmosphere.use_isa_model()  # Use ISA for now
         
-        return self.cd_fb
+        return self.aero_file
     
     def run_baseline_simulation(self):
         """

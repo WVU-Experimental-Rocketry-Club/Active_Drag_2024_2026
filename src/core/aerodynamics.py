@@ -84,9 +84,8 @@ def getTotalDrag(cd_array, velocity, percent_deploy, altitude, diameter):
     AdeployedBrakes = brakeFaceArea * (percent_deploy / 100.0)
     FbrakeDrag = q * AdeployedBrakes * 0.85 # 0.85 is an empirical value for folding brakes from Michael Farha's thesis
 
-    mach_pts = [0.2, 0.4, 0.6, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
     Arocket = np.pi*(diameter/2)**2
-    Rocketdrag = np.interp(mach_num, mach_pts, cd_array[:,0])
+    Rocketdrag = np.interp(mach_num, cd_array['Mach'], cd_array['CD'])
     FrocketDrag = 0.5 * rho * velocity**2 * Rocketdrag * Arocket
 
     totalDrag = FbrakeDrag + FrocketDrag
@@ -111,9 +110,8 @@ def getRocketBodyDrag(cd_array, velocity, percent_deploy, altitude, diameter):
     rho = atm_density(altitude) # p
     c = (speed_of_sound(altitude))
     mach_num = velocity/c
-
-    mach_pts = [0.2, 0.4, 0.6, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
+    
     Arocket = np.pi*(diameter/2)**2
-    Rocketdrag = np.interp(mach_num, mach_pts, cd_array[:,0])
+    Rocketdrag = np.interp(mach_num, cd_array['Mach'], cd_array['CD'])
     FrocketDrag = 0.5 * rho * velocity**2 * Rocketdrag * Arocket
     return FrocketDrag
