@@ -181,7 +181,12 @@ class SimulationRunner:
         target_apogee_AGL = self.config["active_drag_system"]["target_apogee_AGL"] # meters
         ground_level = self.config["simulation_parameters"]["launch_altitude"] # meters
         target_apogee = ground_level + target_apogee_AGL
-        fig, axs = plt.subplots(2, 3, figsize=(20, 10), constrained_layout=True)
+
+        plt.style.use('default')
+        px = 1/plt.rcParams['figure.dpi']  # pixel in inches
+        fig, axs = plt.subplots(2, 3, constrained_layout=True)
+        fig.set_size_inches(10, 6)
+
         axs[0, 0].plot([0, self.results['baseline'][0,-1]], [self.results['baseline'][1,-1], self.results['baseline'][1,-1]], 'k-.')
         axs[0, 0].plot([0, self.results['baseline'][0,-1]], [target_apogee, target_apogee], 'k--')
         axs[0, 0].plot(self.results['baseline'][0,:], self.results['baseline'][1,:])
@@ -327,8 +332,8 @@ def main():
     parser.add_argument(
         '--config', 
         type=str, 
-        # default='configs/competition_rocket_2026.json',
-        default='configs/4inAD.json',
+        default='configs/competition_rocket_2026.json',
+        # default='configs/4inAD.json',
         help='Path to configuration JSON file'
     )
     parser.add_argument(

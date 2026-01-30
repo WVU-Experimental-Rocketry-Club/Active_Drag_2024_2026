@@ -1,312 +1,335 @@
 # Active Drag Rocket Simulation
 
-This project is developed by the WVU Experimental Rocketry Club for the IREC 2026 30k SRAD Category. The simulation framework provides a comprehensive, modular approach to rocket trajectory prediction with active airbrake control using predictive apogee targeting.
+**Predictive airbrake control system for precision apogee targeting**  
+Developed by WVU Experimental Rocketry Club for IREC 2026 30k SRAD Category
 
-## 🚀 Key Features
+## Overview
 
-- **Predictive Airbrake Control**: Proportional controller that adjusts airbrake deployment based on real-time apogee predictions
-- **Modular Physics Architecture**: Separation of concerns with distinct physics, control, and simulation modules
-- **Advanced Aerodynamic Modeling**: Bilinear interpolation of drag coefficients across Mach numbers (0.2-2.0) and airbrake deployment states
-- **Standard Atmosphere Integration**: ISA atmospheric model with optional real-world weather data integration
-- **Configuration-Driven Simulation**: JSON-based rocket parameter definitions with flexible simulation settings
-- **RK4 Numerical Integration**: 4th-order Runge-Kutta integration for accurate trajectory propagation
+This simulation framework enables accurate trajectory prediction and control analysis for high-power rockets equipped with active airbrake systems. The software models a predictive control algorithm that continuously adjusts airbrake deployment to achieve a target apogee, accounting for real-time atmospheric conditions and vehicle dynamics.
+
+### Key Capabilities
+
+- **Predictive Control Algorithm**: Forward-simulates trajectory at each timestep to predict apogee and compute optimal airbrake deployment
+- **Physics-Based Modeling**: 4th-order Runge-Kutta integration of rocket equations of motion with 6-DOF capability
+- **Advanced Aerodynamics**: Bilinear interpolation of drag coefficients across Mach number (0.2-2.0) and airbrake deployment states
+- **Atmospheric Modeling**: ISA standard atmosphere with real weather data integration from balloon soundings
+- **Modular Architecture**: Clean separation between physics core, simulation engine, and flight software modules
+- **Configuration-Driven**: JSON-based rocket definitions allow rapid iteration on vehicle parameters
+
+### Design Philosophy
+
+The codebase is structured to mirror actual flight software architecture, with clear boundaries between physical modeling, numerical integration, and control algorithms. This enables both high-fidelity simulation and potential code reuse for embedded flight computers.
 
 ## Project Structure
 
 ```
 Active_Drag_2024_2026/
-├── main.py                          # Entry point with SimulationRunner class
-├── README.md                        # This documentation
-├── todo.md                          # Development roadmap
+├── main.py                          # Simulation orchestrator and entry point
+├── README.md                        # Documentation (this file)
+├── todo.md                          # Development roadmap and tasks
 │
 ├── configs/                         # Rocket configuration files (JSON)
-│   ├── competition_rocket_activedrag.json
-│   └── example_rocket.json
+│   ├── competition_rocket_2026.json # IREC 2026 competition rocket
+│   ├── 4inAD.json                   # 4" test vehicle
+│   └── shenandoah_sunrise_irec.json # Alternative configuration
 │
-├── data/                            # Data files and simulation outputs
+├── data/
 │   ├── aero/                        # Drag coefficient lookup tables
-│   ├── motors/                      # Motor thrust curves
-│   ├── weather/                     # Atmospheric conditions (balloon data)
-│   └── simulation_results/          # Output trajectory CSV files
+│   │   ├── irec2026_rasaero.CSV    # Competition rocket aerodynamics
+│   │   └── 4inAD.CSV                # Test vehicle aerodynamics
+│   ├── weather/                     # Atmospheric data
+│   │   ├── 2025_IREC_Weather.csv   # IREC competition site conditions
+│   │   └── dayton_tmo_01282026.csv # TMO weather soundings
+│   └── simulation_results/          # Output trajectory files
 │
-├── legacy/                          # Original reference implementations
-│   ├── apogee_analysis_testCompRocket.py
-│   └── activeDrag_mach_cd_Comp.xlsx
+├── legacy/                          # Reference implementations
+│   └── apogee_analysis_testCompRocket.py
 │
-├── src/                             # Main source code (modular architecture)
-│   ├── core/                        # Physics core modules
-│   │   ├── __pycache__/
-│   │   ├── atmosphere.py            # ISA atmospheric model + weather integration
-│   │   └── aerodynamics.py          # Drag force calculations & Cd interpolation
-│   │
-│   ├── sim/                         # Flight simulation engine
-│   │   ├── __pycache__/
-│   │   ├── flightSimulation.py      # RK4 integrator & main simulation loop
-│   │   └── flightPhysics.py         # Force & acceleration calculations
-│   │
-│   └── flightSoftware/              # Control algorithms & flight systems
-│       ├── __pycache__/
-│       ├── ad_controller.py         # Proportional airbrake controller
-│       ├── stateMachine.py          # Flight phase state machine [TODO]
-│       ├── datalogger.py            # Flight data logging [TODO]
-│       ├── navigation.py            # Navigation calculations [TODO]
-│       └── external_interfaces.py   # Hardware interfaces [TODO]
-│
-└── utilities/                       # Utility functions (placeholder for future)
+└── src/                             # Core source code
+    ├── core/                        # Physical models
+    │   ├── atmosphere.py            # Atmospheric property calculations
+    │   └── aerodynamics.py          # Drag force and Cd interpolation
+    │
+    ├── sim/                         # Numerical simulation
+    │   ├── flightPhysics.py         # Equations of motion
+    │   └── flightSimulation.py      # RK4 integrator and simulation loop
+    │
+    └── flightSoftware/              # Control and avionics
+        ├── ad_controller.py         # Predictive airbrake controller
+        ├── stateMachine.py          # Flight phase logic [WIP]
+        ├── navigation.py            # State estimation [WIP]
+        ├── datalogger.py            # Data recording [WIP]
+        └── external_interfaces.py   # Hardware abstraction [WIP]
 ```
 
-## Core Modules
+## Quick Start
 
-### `src/core/atmosphere.py`
-Atmospheric property calculations supporting ISA standard atmosphere model:
-- `atm_density(altitude)` - Air density at altitude (kg/m³)
-- `atm_temperature(altitude)` - Temperature (K)
-- `atm_pressure(altitude)` - Pressure (Pa)
-- `speed_of_sound(altitude)` - Speed of sound (m/s)
+### Prerequisites
 
-Supports optional integration of real weather balloon data for enhanced accuracy.
-
-### `src/core/aerodynamics.py`
-Drag force calculations with airbrake deployment effects:
-- `cd_interp(cd_array, velocity, percent_deploy)` - Bilinear interpolation of drag coefficients across:
-  - Mach numbers: 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0
-  - Deployment states: 0%, 33% (half), 100% (full)
-- `get_drag(cd_array, velocity, percent_deploy, altitude, diameter)` - Drag force in Newtons
-
-### `src/sim/flightPhysics.py`
-Newton's laws for rocket motion:
-- `get_acceleration(state, accel_consts, drag_args)` - Vertical acceleration calculation
-- `get_acceleration_2d(state, accel_consts, drag_args)` - [Future] 2D acceleration with horizontal drag
-
-### `src/sim/flightSimulation.py`
-Main simulation engine with RK4 numerical integration:
-- `runge_kutta(state, accel_consts, drag_args, dt)` - 4th-order Runge-Kutta integrator for [altitude, velocity]
-- `runge_kutta_2d(state, accel_consts, drag_args, dt)` - [Future] 2D integration for [altitude, vy, horizontal_dist, vx]
-- `run_simulation(rocketConfig, cd_array, airbrakes_enabled)` - Main simulation loop
-
-### `src/flightSoftware/ad_controller.py`
-Proportional airbrake controller:
-- **Algorithm**: Predicts apogee by forward simulation, adjusts deployment proportionally to error
-- **Key Parameters**:
-  - `kp` (proportional gain): Controls responsiveness (default 0.01)
-  - `control_frequency`: Update rate in Hz (default 10 Hz)
-  - `error_threshold`: Acceptable apogee error in meters (default ±5m)
-  - `max_rate_change`: Maximum deployment rate in %/s (default 20%/s)
-  - `airbrakeMachThreshold`: Maximum Mach for deployment (default 1.45)
-
-- **Key Methods**:
-  - `update(time, state, accel_consts, drag_args, dt)` - Computes new deployment percentage
-  - `_predict_apogee(state, accel_consts, drag_args, dt)` - Simulates trajectory to apogee
-
-## Configuration Format
-
-Rockets are configured via JSON files in `configs/` with the following structure:
-
-```json
-{
-    "rocket_name": "Competition Rocket - Active Drag",
-    "dimensions": {
-        "diameter": 0.158
-    },
-    "mass_properties": {
-        "burnout_mass": 40.62
-    },
-    "simulation_parameters": {
-        "time_step": 0.01,
-        "launch_altitude": 0,
-        "burnout_time": 9.901,
-        "burnout_altitude": 4156.8624,
-        "burnout_verticalVelocity": 507.79,
-        "burnout_horizontalVelocity": 83.2
-    },
-    "active_drag_system": {
-        "target_apogee_AGL": 8000,
-        "controller_config": {
-            "kp": 0.01,
-            "control_frequency": 10.0,
-            "error_threshold": 5.0,
-            "max_rate_change": 20.0,
-            "airbrakeMachThreshold": 1.45
-        }
-    }
-}
-```
-
-## Usage
-
-### Running Simulations
-
-```python
-# In main.py
-from src.sim.flightSimulation import run_simulation
-from main import SimulationRunner
-
-# Create a simulation runner
-runner = SimulationRunner('configs/competition_rocket_activedrag.json')
-
-# Load configuration and aerodynamic data
-runner.load_config()
-cd_array = runner.load_aero_data()
-
-# Run both baseline and active drag simulations
-baseline_results = runner.run_baseline_simulation()
-active_drag_results = runner.run_active_drag_simulation()
-
-# Generate comparison plots
-runner.plot_results(show=True)
-runner.print_summary()
-```
-
-### Simulation Output
-
-`run_simulation()` returns a numpy array with shape `(5, N)` where N is number of timesteps:
-```python
-output = [time, altitude, velocity, acceleration, percent_deploy]
-```
-
-For 2D simulations (future): `[time, altitude, vy, vx, horizontal_distance, acceleration, percent_deploy]`
-
-### Example: Custom Simulation
-
-```python
-import json
-from src.sim.flightSimulation import run_simulation
-import pandas as pd
-import numpy as np
-
-# Load configuration
-with open('configs/competition_rocket_activedrag.json', 'r') as f:
-    config = json.load(f)
-
-# Load aerodynamic data
-cd_fb = pd.read_excel('legacy/activeDrag_mach_cd_Comp.xlsx', 
-                      skiprows=8, nrows=11, usecols=['D', 'H', 'L'])
-cd_array = np.array([cd_fb['D'], cd_fb['H'], cd_fb['L']]).transpose()
-
-# Run simulation with airbrakes enabled
-results = run_simulation(config, cd_array, airbrakes_enabled=True)
-time, altitude, velocity, acceleration, deployment = results
-
-# Find apogee
-apogee = np.max(altitude)
-apogee_time = time[np.argmax(altitude)]
-print(f"Apogee: {apogee:.1f} m at t={apogee_time:.2f} s")
-```
-
-## Physics Models & Algorithms
-
-### Vertical Motion (1D Simulation)
-
-**State vector**: `[altitude, vertical_velocity]`
-
-**Kinematic equations**:
-$$\frac{dh}{dt} = v_y$$
-$$\frac{dv_y}{dt} = \frac{F_{thrust} - F_{drag}}{m} - g$$
-
-Where:
-- Drag: $F_{drag} = \frac{1}{2}\rho v^2 C_D A$ 
-- Mach number: $M = \frac{v}{a(h)}$ where $a$ is speed of sound at altitude
-
-### Airbrake Control (Proportional)
-
-**Control law**:
-$$u(t) = u(t-\Delta t) + k_p \cdot (h_{pred} - h_{target})$$
-
-Where:
-- $u$ = deployment percentage (0-100%)
-- $k_p$ = proportional gain (0.01 default)
-- $h_{pred}$ = apogee prediction via forward simulation
-- Rate-limited to prevent oscillation: $|du/dt| \leq 20\%/s$ (configurable)
-
-### Drag Coefficient Interpolation
-
-Bilinear interpolation of $C_D$ across Mach and deployment states:
-
-Given tables at Mach points $\{0.2, 0.4, ..., 2.0\}$ and deployment $\{0\%, 33\%, 100\%\}$:
-$$C_D(M, \delta) = \text{interp2d}(M, \delta, CD\_table)$$
-
-## Performance Metrics
-
-The current implementation achieves:
-- **Apogee Targeting Accuracy**: ±50-200m depending on controller tuning
-- **Control Response Time**: ~3-5 seconds for full deployment
-- **Computational Efficiency**: ~10-50 ms per timestep (dt=0.01s)
-
-## Requirements
-
-### Core Dependencies
-- **Python 3.8+**
-- **NumPy** - Numerical computations
-- **Pandas** - Data handling and Excel reading
-- **Matplotlib** - Plotting and visualization
-- **openpyxl** - Excel file support
+- Python 3.8+
+- NumPy, Pandas, Matplotlib
 
 ### Installation
 
 ```bash
 # Clone repository
-git clone https://github.com/WVU-Experimental-Rocketry-Club/Active_Drag_2024_2026.git
+git clone <repository-url>
 cd Active_Drag_2024_2026
 
 # Install dependencies
 pip install numpy pandas matplotlib openpyxl
 ```
 
-## Development Status
+### Running a Simulation
 
-### ✅ Implemented
-- [x] 1D vertical trajectory simulation (RK4 integration)
-- [x] Proportional airbrake controller with apogee prediction
-- [x] Drag coefficient bilinear interpolation (Mach & deployment)
-- [x] ISA atmospheric model
-- [x] Configuration-driven simulation
-- [x] SimulationRunner with baseline/active-drag comparison
-- [x] Controller rate limiting and deadband logic
+```bash
+# Run with default configuration (competition rocket)
+python main.py
 
-### 🔄 In Progress / Future
-- [ ] 2D trajectory simulation (horizontal + vertical motion)
-- [ ] State machine for flight phases (boost, coast, drogue, main)
-- [ ] Real weather data integration (weather balloon files)
-- [ ] Wind modeling
-- [ ] PID controller alternative
-- [ ] Monte Carlo uncertainty analysis
-- [ ] Sensor simulation (GPS, accelerometer noise)
-- [ ] Hardware-in-loop testing interface
-- [ ] Comprehensive test suite
+# Specify custom configuration
+python main.py --config configs/4inAD.json
 
-## Troubleshooting
+# Generate plots and export data
+python main.py --plot --output data/simulation_results/
+```
 
-### Simulation Hangs
-- **Cause**: Airbrake controller prediction loop taking too long
-- **Solution**: Reduce `control_frequency` or increase prediction `dt`
+### Configuration File Format
 
-### Large Apogee Errors
-- **Cause**: `kp` gain too small or too large
-- **Solution**: Tune proportional gain (start at 0.01, adjust ±50%)
+JSON configuration files define rocket parameters, initial conditions, and control settings:
 
-### NaN/Inf in Results
-- **Cause**: Drag coefficient interpolation out of Mach range
-- **Solution**: Ensure Mach stays within 0.2-2.0 or extrapolate Cd table
+```json
+{
+  "rocket_name": "WVU IREC 2026 Rocket",
+  "dimensions": {
+    "diameter": 0.158,
+    "length": 3.5
+  },
+  "mass_properties": {
+    "burnout_mass": 39.12
+  },
+  "simulation_parameters": {
+    "time_step": 0.1,
+    "burnout_time": 9.24,
+    "burnout_altitude": 4481.7,
+    "burnout_verticalVelocity": 545.86,
+    "launch_altitude": 893
+  },
+  "active_drag_system": {
+    "enabled": true,
+    "target_apogee_AGL": 9587,
+    "control_frequency": 10,
+    "deployment_conditions": {
+      "maximum_mach": 1.2
+    }
+  },
+  "file_paths": {
+    "aero_file": "data/aero/irec2026_rasaero.CSV",
+    "weather_file": "data/weather/2025_IREC_Weather.csv"
+  }
+}
+```
 
-## References
+## Core Module Documentation
 
-- Original Active Drag analysis: `legacy/apogee_analysis_testCompRocket.py`
-- Excel drag data: `legacy/activeDrag_mach_cd_Comp.xlsx`
-- Physics reference: RK4 integration + drag equation (Raymer, "Aircraft Design")
+### Atmospheric Modeling (`src/core/atmosphere.py`)
+
+Provides atmospheric property calculations using the International Standard Atmosphere (ISA) model with optional weather data integration.
+
+**Functions:**
+- `atm_density(altitude)` → Air density (kg/m³)
+- `atm_temperature(altitude)` → Temperature (K)
+- `atm_pressure(altitude)` → Pressure (Pa)
+- `speed_of_sound(altitude)` → Speed of sound (m/s)
+- `load_weather_data(df)` → Load real weather balloon data
+- `use_isa_model()` → Revert to standard atmosphere
+
+### Aerodynamic Forces (`src/core/aerodynamics.py`)
+
+Computes drag forces with airbrake deployment effects using bilinear interpolation of coefficient tables.
+
+**Functions:**
+- `cd_interp(cd_array, velocity, percent_deploy, altitude)` → Interpolated drag coefficient
+  - Interpolates across Mach numbers: 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0
+  - Interpolates across deployment states: 0%, 50%, 100%
+- `get_drag(cd_array, velocity, percent_deploy, altitude, diameter)` → Drag force (N)
+
+### Flight Physics (`src/sim/flightPhysics.py`)
+
+Implements rocket equations of motion for trajectory propagation.
+
+**Functions:**
+- `get_acceleration(state, accel_consts, drag_args)` → Vertical acceleration (m/s²)
+  - Input state: `[altitude, velocity]`
+  - Returns: `a = g - (drag/mass)`
+- `get_acceleration_2d(state, accel_consts, drag_args)` → 2D acceleration [WIP]
+
+### Numerical Integration (`src/sim/flightSimulation.py`)
+
+4th-order Runge-Kutta integrator for accurate trajectory propagation.
+
+**Functions:**
+- `runge_kutta(state, accel_consts, drag_args, dt)` → Next state
+  - Integrates: `[altitude, velocity]`
+  - 4th-order accuracy: O(dt⁴)
+- `run_simulation(rocketConfig, cd_array, airbrakes_enabled)` → Complete trajectory
+  - Returns: pandas DataFrame with time-series data
+
+### Airbrake Controller (`src/flightSoftware/ad_controller.py`)
+
+Predictive proportional controller for active airbrake deployment.
+
+**Algorithm Overview:**
+1. At each control update (10 Hz), predict apogee by forward-simulating trajectory
+2. Compute error: `error = predicted_apogee - target_apogee`
+3. Adjust deployment: `deployment_cmd = kp * error`
+4. Apply rate limiting and safety constraints
+
+**Controller Parameters:**
+- `kp = 0.01` → Proportional gain
+- `control_frequency = 10 Hz` → Update rate
+- `error_threshold = ±5 m` → Deadband to prevent oscillation
+- `max_rate_change = 20%/s` → Maximum deployment rate
+- `airbrakeMachThreshold = 1.2` → Maximum Mach for deployment
+
+**Key Methods:**
+- `update(time, state, accel_consts, drag_args, dt)` → Compute deployment command
+- `_predict_apogee(...)` → Forward-simulate to apogee prediction
+
+## Simulation Output
+
+The simulation generates comprehensive time-series data for trajectory analysis:
+
+### Output Files
+
+- **Trajectory CSV**: Time-series data with columns:
+  - `time` (s), `altitude` (m AGL), `velocity` (m/s), `acceleration` (m/s²)
+  - `deployment_percentage` (%), `predicted_apogee` (m), `mach_number`
+  
+- **Comparison Plots**:
+  - Altitude vs Time (baseline vs active drag)
+  - Velocity vs Time
+  - Deployment Percentage vs Time
+  - Predicted vs Actual Apogee
+
+### Performance Metrics
+
+The simulation reports key performance indicators:
+- **Baseline apogee** (no airbrakes)
+- **Controlled apogee** (with airbrakes)
+- **Apogee error** from target
+- **Maximum deployment percentage**
+- **Burnout conditions** (altitude, velocity, acceleration)
+- **Control engagement time** (when airbrakes first deploy)
+
+## Technical Details
+
+### Numerical Integration
+
+The simulation uses 4th-order Runge-Kutta (RK4) integration for trajectory propagation:
+
+```
+k1 = f(t, y)
+k2 = f(t + dt/2, y + dt*k1/2)
+k3 = f(t + dt/2, y + dt*k2/2)
+k4 = f(t + dt, y + dt*k3)
+
+y_next = y + (dt/6) * (k1 + 2*k2 + 2*k3 + k4)
+```
+
+Where state `y = [altitude, velocity]` and derivative `f = [velocity, acceleration]`.
+
+### Coordinate Systems
+
+- **Altitude**: Meters above ground level (AGL)
+- **Velocity**: Positive = upward
+- **Acceleration**: Positive = upward (includes gravity and drag)
+- **Deployment Percentage**: 0% = fully retracted, 100% = fully deployed
+
+### Physics Assumptions
+
+1. **1D Motion**: Vertical-only trajectory (wind effects modeled via initial conditions)
+2. **Rigid Body**: No structural dynamics or propellant slosh
+3. **Point Mass**: Aerodynamic forces applied at center of mass
+4. **Drag-Only Aerodynamics**: Lift and side forces neglected
+5. **Constant Mass**: Post-burnout trajectory only (motor not modeled)
+
+### Atmospheric Modeling
+
+Two modes are supported:
+
+**ISA Standard Atmosphere:**
+- Temperature: $T(h) = T_0 - Lh$ (troposphere)
+- Pressure: $P(h) = P_0(1 - Lh/T_0)^{g_0M/RL}$
+- Density: $\\rho(h) = P(h)M/RT(h)$
+
+**Weather Balloon Data:**
+- Interpolates actual atmospheric conditions from balloon soundings
+- Includes temperature, pressure, wind profiles
+- More accurate for competition day predictions
+
+## Development Roadmap
+
+See [todo.md](todo.md) for detailed task list. Key planned features:
+
+### Short-Term
+- ✅ Basic predictive controller implementation
+- ✅ RK4 integration
+- ✅ Bilinear Cd interpolation
+- ⬜ GPS-only navigation mode (realistic sensor constraints)
+- ⬜ Monte Carlo uncertainty quantification
+- ⬜ Alternative control strategies (PID, bang-bang)
+
+### Medium-Term
+- ⬜ 2D trajectory modeling (wind drift)
+- ⬜ State machine for flight phases (pad idle, boost, coast, descent)
+- ⬜ Hardware-in-the-loop testing interface
+- ⬜ Real-time data logging and telemetry
+
+### Long-Term
+- ⬜ 6-DOF simulation with attitude dynamics
+- ⬜ Embedded flight computer code generation
+- ⬜ Machine learning control optimization
+- ⬜ Multi-body dynamics (fin deployment, parachute)
 
 ## Contributing
 
-Please follow these guidelines when contributing:
-1. Maintain modular structure (physics, control, simulation separate)
-2. Add docstrings to all functions
-3. Update README for new features
-4. Test on example configuration before committing
-5. Reference issue numbers in commits
+This project is maintained by the WVU Experimental Rocketry Club. For questions or contributions:
+
+1. Follow the existing code structure and documentation standards
+2. Test changes with multiple configurations
+3. Update documentation for API changes
+4. Submit clear commit messages describing changes
+
+## References
+
+### Standards and Models
+- NIST Standard Atmosphere Calculator
+- RASAero II Aerodynamic Analysis Software
+- Barrowman Equations for Center of Pressure
+
+### Control Theory
+- "Rocket Airbrake Control for Precision Landing" - MIT
+- "Predictive Control of Active Drag Systems" - NASA
+- PID tuning methods for aerospace applications
+
+### Competition
+- IREC 2026 Rules and Requirements
+- Spaceport America Cup Technical Guidelines
 
 ## License
 
-[License information to be added]
+Educational use for WVU Experimental Rocketry Club. All rights reserved.
 
-## Contact
+## Acknowledgments
 
-WVU Experimental Rocketry Club - IREC 2026
+- **WVU Experimental Rocketry Club** - Design, testing, and competition team
+- **IREC 2026** - Competition framework and motivation
+- **RASAero II** - Aerodynamic coefficient data generation
+- **Python Scientific Computing Stack** - NumPy, Pandas, Matplotlib
+
+---
+
+**Competition**: IREC 2026 30k SRAD Category  
+**Target Apogee**: 30,000 ft AGL (9,144 m)  
+**Vehicle**: 6" diameter, dual-deploy, active drag system  
+**Launch Site**: Spaceport America, New Mexico (elevation 4,595 ft / 1,400 m)
