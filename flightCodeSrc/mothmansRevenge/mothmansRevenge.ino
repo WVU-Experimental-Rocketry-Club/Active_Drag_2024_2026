@@ -17,12 +17,12 @@ void loop() {
     Serial.println("\n\nStarting Computation");
     Serial.printf("Rk4 test: %f\n", rk4_step(startState, dt, 0.0f).y);
     Serial.printf("get drag: %f\n", get_total_drag(startState.vy, startState.y, 0.0));
-    int startTime = micros();
+    int startTime = millis();
     float predictedApogee = predictApgee(startState, 0.0f, dt);
-    int elapsedTime = micros() - startTime;
+    int elapsedTime = millis() - startTime;
     Serial.println("Computation Complete");
     Serial.printf("Predicted Apogee: %f\n", predictedApogee);
-    Serial.printf("Compute Time: %d us", elapsedTime);
+    Serial.printf("Compute Time: %d ms", elapsedTime);
 
     delay(2000);
 }
