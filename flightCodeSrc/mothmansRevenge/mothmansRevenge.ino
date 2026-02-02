@@ -24,7 +24,7 @@ void loop() {
     Serial.printf("Predicted Apogee: %f\n", predictedApogee);
     Serial.printf("Compute Time: %d us", elapsedTime);
 
-    delay(1000);
+    delay(2000);
 }
 
 float predictApgee(rk4State initialState, float deployAngle, float dt) {
@@ -33,10 +33,10 @@ float predictApgee(rk4State initialState, float deployAngle, float dt) {
     Serial.printf("Alt: %f\nVy: %f\n", state.y, state.vy);
     int iterations = 0;
     while (state.vy > 0.0f) {
-        Serial.println("here");
         state = rk4_step(state, dt, deployAngle);
         iterations++;
     }
+    Serial.printf("Iterations: %d\n", iterations);
     return state.y;
 }
 

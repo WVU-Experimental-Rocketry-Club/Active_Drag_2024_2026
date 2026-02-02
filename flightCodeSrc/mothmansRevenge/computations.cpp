@@ -67,7 +67,7 @@ float get_pressure(float altitude) {
 float get_temperature(float altitude) {
     const int index = std::lower_bound(BALLOON_ALT_LUT, BALLOON_ALT_LUT + BALLOON_TABLE_SIZE, altitude) - BALLOON_ALT_LUT;
     const float temperature = BALLOON_TEMP_LUT[std::clamp(index, 0, static_cast<int>(BALLOON_TABLE_SIZE - 1))];
-    return temperature;
+    return temperature + 273.15f;
 }
 float get_density(float altitude) {
     float pressure = get_pressure(altitude);
