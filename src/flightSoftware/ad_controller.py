@@ -75,7 +75,7 @@ class AirbrakeController:
         # Controller parameters
         config = config or {}
         self.airbrakeMachThreshold = rocketConfig["active_drag_system"]["deployment_conditions"]["maximum_mach"]
-        self.deployment_time = config.get('deployment_time', 3.0)
+        self.deployment_time = rocketConfig["active_drag_system"]["full_deploy_time"]
         self.error_threshold = config.get('error_threshold', 5.0)
         self.control_frequency = config.get('control_frequency', 100.0)
         self.max_deployment = config.get('max_deployment', 100.0)

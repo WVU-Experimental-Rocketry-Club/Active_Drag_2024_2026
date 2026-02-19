@@ -332,8 +332,8 @@ def main():
     parser.add_argument(
         '--config', 
         type=str, 
-        default='configs/competition_rocket_2026.json',
-        # default='configs/4inAD.json',
+        # default='configs/competition_rocket_2026.json',
+        default='configs/4inAD.json',
         help='Path to configuration JSON file'
     )
     parser.add_argument(

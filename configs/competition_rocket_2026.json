@@ -33,6 +33,7 @@
         "control_frequency": 10,
         "max_brake_force2": 1112.06,
         "max_brake_force": 500,
+        "full_deploy_time": 1.5,
         "deployment_conditions": {
             "min_time_after_burnout": 1.0,
             "maximum_mach":1.2
