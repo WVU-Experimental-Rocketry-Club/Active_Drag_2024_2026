@@ -113,3 +113,6 @@ def getRocketBodyDrag(cd_array, velocity, altitude, diameter):
     Rocketdrag = np.interp(mach_num, cd_array['Mach'], cd_array['CD'])
     FrocketDrag = 0.5 * rho * velocity**2 * Rocketdrag * Arocket
     return FrocketDrag
+
+def getBrakeCd(deployPercent, mach):
+    a = 0

@@ -27,10 +27,12 @@
     "active_drag_system": {
         "enabled": true,
         "brake_face_area": 0.01241933,
-        "target_apogee_AGL": 2750.0,
+        "target_apogee_AGL": 3300.0,
         "control_frequency": 10,
         "full_deploy_time": 3.5,
-        "max_brake_force": 500,
+        "max_brake_force": 222,
+        "max_deployment": 100,
+        "min_deployment": 40,
         "deployment_conditions": {
             "min_time_after_burnout": 1.0,
             "maximum_mach": 0.95

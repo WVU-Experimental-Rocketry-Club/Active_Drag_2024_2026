@@ -78,7 +78,8 @@ class AirbrakeController:
         self.deployment_time = rocketConfig["active_drag_system"]["full_deploy_time"]
         self.error_threshold = config.get('error_threshold', 5.0)
         self.control_frequency = config.get('control_frequency', 100.0)
-        self.max_deployment = config.get('max_deployment', 100.0)
+        self.max_deployment = rocketConfig["active_drag_system"]["max_deployment"]
+        self.min_deployment = rocketConfig["active_drag_system"]["min_deployment"]
         self.kp = config.get('kp', .02)  # Proportional gain
         self.maxBrakeForece = rocketConfig["active_drag_system"]["max_brake_force"]  # Newtons
         
@@ -86,6 +87,8 @@ class AirbrakeController:
         self.current_deployment = 0.0
         self.predicted_apogee = 0.0
         self.last_update_time = 0.0
+
+        self.startDeploying = False
         
         # Calculate deployment rate (percent per second)
         self.deployment_rate = 100.0 / self.deployment_time
@@ -117,14 +120,26 @@ class AirbrakeController:
             prediction_dt = dt
         # Predict apogee using forward simulation
         # time_counter = timer.time()
-        self.predicted_apogee = self._predict_apogee(state, accel_consts, drag_args, prediction_dt)
+
+        pred_drag_args = drag_args.copy()
+        pred_drag_args[1] = self.current_deployment
+        self.predicted_apogee = self._predict_apogee(state, accel_consts, pred_drag_args, prediction_dt)
+
+
         # lastloop_time = timer.time() - time_counter
         # print(f"Loop Time: {lastloop_time*1000:.2f} ms")
         # Calculate error
         error = self.predicted_apogee - curr_target_apogee
+
+        if self.startDeploying == False:
+            threshold_drag_args = drag_args.copy()
+            threshold_drag_args[1] = self.min_deployment
+            brakeAlt = self._predict_apogee(state, accel_consts, threshold_drag_args, prediction_dt)
+            if brakeAlt - curr_target_apogee >= 0:
+                self.startDeploying = True
         
         # Adjust deployment if outside error threshold
-        if abs(error) > self.error_threshold and state[1] < self.airbrakeMachThreshold * speed_of_sound(state[0]):
+        if abs(error) > self.error_threshold and state[1] < self.airbrakeMachThreshold * speed_of_sound(state[0]) and self.startDeploying:
             # Proportional control: more error = faster deployment change
             # Positive error (too high) → increase deployment (more drag)
             # Negative error (too low) → decrease deployment (less drag)
@@ -160,7 +175,7 @@ class AirbrakeController:
         
         # Update drag_args with current deployment
         pred_drag_args = drag_args.copy()
-        pred_drag_args[1] = self.current_deployment
+        # pred_drag_args[1] = self.current_deployment
         
         # Simulate forward until velocity reaches zero (apogee)
         max_iterations = 10000  # Safety limit
