@@ -1,0 +1,48 @@
+Rocket Name,WVUER_AD_2327
+Firmware,25a237f 10/12/2025 15:57:13
+Serial number,SN2327 WVUER_AD_2327
+Max Altitude,2376.59 feet
+Max velocity,67.88 feet/sec
+Pad altitude ASL,934.37 feet
+Launch date,28-Feb-26
+Launch time,12:31:55.043
+Time to first burnout,1.2 sec
+Time to Apo channel fire,16.3 sec
+Time to gyro overload,1.1 sec
+Time to third channel fire,46.9 sec
+Time to main channel fire,46.9 sec
+Time to fourth channel fire,17.2 sec
+Launch rod angle,1.4 deg
+Tilt angle at burnout,3.0 deg
+Roll rate at burnout,82.5 deg/sec
+Thrust tilt efficiency,99.47%
+Number of ascent rolls,2.498
+Horiz. velocity at apogee,67.9 feet/sec
+Inertial navigation max alt,2401.9 feet
+Max motor burn acceleration,225.6 Gs
+Peak drag deceleration,11.9 Gs
+Apo channel max accel,6.7 Gs
+Main channel max accel,6.7 Gs
+3rd channel max accel,6.7 Gs
+4th channel max accel,6.7 Gs
+Max landing accel,48.4 Gs
+Drogue descent rate,-62.8 feet/sec
+Main chute deploy altitude,376.1 feet
+Main chute descent rate,-23.7 feet
+Landing Time,12:33:01.583
+Temperature on pad,77.2 F
+Max Temperature,77.2 F
+Min Temperature,76.16 F
+Battery voltage on pad,7.92 V
+Min Battery voltage,7.90 V
+Battery voltage at landing,7.9 V
+Build date,12-Oct-25
+Build time,15:57:13.000
+Flight number,2
+Direction of 1st motion,-0.9998,0.0151,-0.0117
+Gravity direction on pad,-0.9993,0.0382,-0.0017
+Low-G accel pad offset,-0.0038,0.0001,-0.0000
+Hi-G accel pad offset,0.01,-0.05,-0.02
+Pad gyro rates (deg/sec),0.05,-0.16,-0.05
+Pad Hi-G accel,-0.99,-0.01,-0.03
+Pad Low-G Accel,-1.00,0.04,-0.00

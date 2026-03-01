@@ -8,7 +8,7 @@
         "nose_cone_length": 0.4
     },
     "mass_properties": {
-        "burnout_mass": 12.097
+        "burnout_mass": 11.8
     },
     "file_paths": {
         "aero_file": "data/aero/4inAD.CSV",
@@ -26,8 +26,8 @@
     },
     "active_drag_system": {
         "enabled": true,
-        "brake_face_area": 0.01241933,
-        "target_apogee_AGL": 3300.0,
+        "brake_face_area": 0.013064,
+        "target_apogee_AGL": 3048.0,
         "control_frequency": 10,
         "full_deploy_time": 3.5,
         "max_brake_force": 222,
