@@ -8,7 +8,7 @@
         "nose_cone_length": 0.4
     },
     "mass_properties": {
-        "burnout_mass": 39.12
+        "burnout_mass": 39.58
     },
     "file_paths": {
         "aero_file": "data/aero/irec2026_rasaero.CSV",
@@ -18,27 +18,28 @@
         "time_step": 0.1,
         "max_simulation_time": 300,
         "launch_altitude": 893,
-        "burnout_time": 9.24,
-        "burnout_verticalVelocity": 545.86,
-        "burnout_horizontalVelocity": 86.29,
-        "burnout_acceleration": -39.3,
-        "burnout_altitude": 4481.7
+        "burnout_time": 9.44,
+        "burnout_verticalVelocity": 530.3,
+        "burnout_horizontalVelocity": 68.36,
+        "burnout_acceleration": -41.94,
+        "burnout_altitude": 4489.7
     },
     "active_drag_system": {
         "enabled": true,
         "brake_face_area_2x3": 0.015483871,
-        "brake_face_area": 0.0232258,
+        "brake_face_area": 0.0252258,
+        "brake_face_area_5x3": 0.0232258,
         "target_apogee_AGL2": 9144,
         "target_apogee_AGL": 9587,
         "control_frequency": 10,
         "max_brake_force2": 1112.06,
-        "max_brake_force": 500,
+        "max_brake_force": 1000,
         "max_deployment": 100,
-        "min_deployment": 25,
-        "full_deploy_time": 1.5,
+        "min_deployment": 50,
+        "full_deploy_time": 0.75,
         "deployment_conditions": {
             "min_time_after_burnout": 1.0,
-            "maximum_mach":1.2
+            "maximum_mach":0.9
         }
     }
 }
