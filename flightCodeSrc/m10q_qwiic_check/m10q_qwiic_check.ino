@@ -50,6 +50,7 @@ void setup()
   Serial.println("SparkFun u-blox Example");
 
   Wire.begin(); // Start I2C
+  Wire.setClock(400000);
 
   //myGNSS.enableDebugging(); // Uncomment this line to enable helpful debug messages on Serial
 

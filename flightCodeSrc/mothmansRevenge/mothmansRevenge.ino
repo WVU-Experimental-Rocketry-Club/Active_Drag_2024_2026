@@ -55,7 +55,7 @@ String a;
 #define stepDelayMicroseconds 83 //450rpm at 1600microsteps
 
 int launchDetectGs = 4;
-float motorBurntime = 4;
+float motorBurntime = 2;
 int soundSpeed = 343; //m/s at sea level
 int flightBeginTime;
 
@@ -63,7 +63,7 @@ float accelX, accelY, accelZ;
 float gyroX, gyroY, gyroZ;
 float magX, magY, magZ;
 
-float launchAltitudeOffset = 0;
+float launchAltitudeOffset = 0.0f;
 
 struct gpsState {
     uint8_t SIV;
@@ -110,6 +110,7 @@ void setup() {
     EasyBuzzer.setPin(BUZZER_PIN);
 
     Wire.begin();  // Start I2C
+    Wire.setClock(400000);
 
     //myGNSS.enableDebugging(); // Uncomment this line to enable helpful debug messages on Serial
 
@@ -121,24 +122,24 @@ void setup() {
 
     myGNSS.setI2COutput(COM_TYPE_UBX);  //Set the I2C port to output UBX only (turn off NMEA noise)
     myGNSS.setDynamicModel(DYN_MODEL_AIRBORNE4g);
-    myGNSS.setAutoPVT(true);
+    // myGNSS.setAutoPVT(true);
 
-    if (myGNSS.setAopCfg(1) == true) {
-      Serial.println(F("aopCfg enabled"));
-    } else {
-      Serial.println(F("Could not enable aopCfg. Please check wiring. Freezing."));
-    }
+    // if (myGNSS.setAopCfg(1) == true) {
+    //   Serial.println(F("aopCfg enabled"));
+    // } else {
+    //   Serial.println(F("Could not enable aopCfg. Please check wiring. Freezing."));
+    // }
 
     myGNSS.setNavigationFrequency(10);
 
     //myGNSS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT); //Optional: save (only) the communications port settings to flash and BBR
 
 
-    // bno085 --------------------------------
-    imu.begin(0x4A, Wire);
-    imu.enableAccelerometer(50);
-    imu.enableGyro(50);
-    imu.enableMagnetometer(50);
+    // // bno085 --------------------------------
+    // imu.begin(0x4A, Wire);
+    // imu.enableAccelerometer(50);
+    // imu.enableGyro(50);
+    // imu.enableMagnetometer(50);
 
 
           // Mount filesystem
@@ -164,7 +165,7 @@ void loop() {
 
     // delay(2000);
     updateSensors();
-    handleSerialCommands();
+    // handleSerialCommands();
 
 
 
@@ -227,14 +228,14 @@ void updateSensors() {
   {
     // uint8_t dynModel = myGNSS.getDynamicModel();
 
-    float latitude = myGNSS.getLatitude() / 10000000.0; //degrees
+    float latitude = myGNSS.getLatitude() / 10000000.0f; //degrees
 
-    float longitude = myGNSS.getLongitude() / 10000000.0; //degrees
+    float longitude = myGNSS.getLongitude() / 10000000.0f; //degrees
 
-    float altitude = myGNSS.getAltitudeMSL() / 1000; // Altitude above Mean Sea Level (conv to meters)
+    float altitude = myGNSS.getAltitudeMSL() / 1000.0f; // Altitude above Mean Sea Level (conv to meters)
 
-    float hvel = myGNSS.getGroundSpeed() / 1000.0; //mm/s -> m/s
-    float vvel = -myGNSS.getNedDownVel() / 10000.0; //flip to ascending 
+    float hvel = myGNSS.getGroundSpeed() / 1000.0f; //mm/s -> m/s
+    float vvel = -myGNSS.getNedDownVel() / 1000.0f; //flip to ascending 
 
     uint8_t satellites = myGNSS.getSIV(); // Satellites In View
 
@@ -269,7 +270,7 @@ void padIdle() {
     EasyBuzzer.beep(2000, 50, 50, 3, 500, 0);
     initState = true;
   }
-  if (currGpsState.alt - launchAltitudeOffset >= 100) {
+  if (currGpsState.alt - launchAltitudeOffset >= 100.0f) {
     flightState = 2;
     initState = false;
     startLogging();
@@ -286,6 +287,7 @@ void padIdle() {
     //       Serial.print("accelx: ");
     // Serial.println(accelZ);
     Serial.print("\n\n\n");
+    // delay(100);
 }
 
 void flightPower() {
