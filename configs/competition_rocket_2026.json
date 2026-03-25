@@ -12,7 +12,7 @@
     },
     "file_paths": {
         "aero_file": "data/aero/irec2026_rasaero.CSV",
-        "weather_file": "data/weather/2025_IREC_Weather.csv"
+        "weather_file": "data/weather/kansas2026am.csv"
     },
     "simulation_parameters": {
         "time_step": 0.1,
@@ -30,7 +30,7 @@
         "brake_face_area": 0.0252258,
         "brake_face_area_5x3": 0.0232258,
         "target_apogee_AGL2": 9144,
-        "target_apogee_AGL": 9587,
+        "target_apogee_AGL": 9545.0,
         "control_frequency": 10,
         "max_brake_force2": 1112.06,
         "max_brake_force": 1000,
@@ -39,7 +39,7 @@
         "full_deploy_time": 0.75,
         "deployment_conditions": {
             "min_time_after_burnout": 1.0,
-            "maximum_mach":0.9
+            "maximum_mach":0.95
         }
     }
 }

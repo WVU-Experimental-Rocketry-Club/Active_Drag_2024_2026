@@ -9,6 +9,24 @@
 
 #include "EasyBuzzer.h"
 
+#include <ODriveUART.h>
+
+HardwareSerial& odrive_serial = Serial1;
+unsigned long baudrate = 115200;
+
+ODriveUART odrive(odrive_serial);
+
+const float VEL_LIMIT   = 35.0f;   // turns/sec   - gentle speed
+const float ACCEL_LIMIT = 250.0f;  // turns/sec²  - gentle acceleration
+const float DECEL_LIMIT = 100.0f;  // turns/sec²  - gentle deceleration
+
+uint32_t lastWatchdog    = 0;
+uint32_t lastTelemetry   = 0;
+
+float desiredMotorPosition = 0;
+float deploymentTime = 1.5;
+float deploymentRatePct = 100.0 / deploymentTime;
+
 #define LOG_FILE "/flight_log.csv"
 
 bool printDebug = false; 
@@ -44,6 +62,9 @@ void logSample();
 void handleSerialCommands();
 void dumpLog();
 void eraseLog();
+
+void testMove();
+void testRk4();
 
 #define stepPin 26
 #define dirPin 27
@@ -100,7 +121,7 @@ struct airbrakeState {
   float deployPct;
   float apoEstimate;
 };
-airbrakeState currAirbrakeState = {0.0f, 0.0f};
+airbrakeState currAirbrakeState = {0.0f, 0.0f}; //deploypct, apoestimate
 
 bool newGpsData = false;
 
@@ -154,6 +175,51 @@ void setup() {
     else {
     Serial.println("LittleFS mounted.");
     }
+
+    odrive_serial.begin(baudrate);
+
+     Serial.println("Waiting for ODrive...");
+    while (odrive.getState() == AXIS_STATE_UNDEFINED) {
+      delay(100);
+    }
+
+    Serial.println("found ODrive");
+    
+    Serial.print("DC voltage: ");
+    Serial.println(odrive.getParameterAsFloat("vbus_voltage"));
+
+    // ---- Configure trap trajectory limits ----
+    odrive.setParameter("axis0.controller.config.vel_limit", VEL_LIMIT);
+    odrive_serial.println("u 0 1");
+    delay(50);
+    
+    odrive.setParameter("axis0.trap_traj.config.vel_limit", VEL_LIMIT);
+    odrive_serial.println("u 0 1");
+    delay(50);
+    
+    odrive.setParameter("axis0.trap_traj.config.accel_limit", ACCEL_LIMIT);
+    odrive_serial.println("u 0 1");
+    delay(50);
+    
+    odrive.setParameter("axis0.trap_traj.config.decel_limit", DECEL_LIMIT);
+    odrive_serial.println("u 0 1");
+    delay(50);
+
+    // ---- Use position control with trap trajectory input mode ----
+    odrive.setParameter("axis0.controller.config.control_mode", 3); // CONTROL_MODE_POSITION
+    odrive_serial.println("u 0 1");
+    delay(50);
+    
+    odrive.setParameter("axis0.controller.config.input_mode", 5);   // INPUT_MODE_TRAP_TRAJ
+    odrive_serial.println("u 0 1");
+    delay(50);
+
+    while (odrive.getState() != AXIS_STATE_CLOSED_LOOP_CONTROL) {
+      odrive.clearErrors();
+      odrive.setState(AXIS_STATE_CLOSED_LOOP_CONTROL);
+      Serial.println("config axis state");
+      delay(10);
+    }
 }
 
 void loop() {
@@ -171,6 +237,22 @@ void loop() {
     // delay(2000);
     updateSensors();
     handleSerialCommands();
+
+      ODriveFeedback feedback = odrive.getFeedback();
+      if (printDebug) {
+      Serial.print("pos:");
+      Serial.print(feedback.pos);
+      Serial.print(", ");
+      Serial.print("vel:");
+      Serial.print(feedback.vel);
+      Serial.println();
+      }
+      if (desiredMotorPosition <=0.0f && desiredMotorPosition >= -15.0f) {
+        odrive.setPosition(desiredMotorPosition);
+      }
+      else {
+        odrive.setPosition(0);
+      }
 
 
 
@@ -192,11 +274,12 @@ void loop() {
 void loop1() {
   // EasyBuzzer.beep(0, 100, 100, 2, 2000, 0);
   EasyBuzzer.update();
+
 }
 
-float predictApogee(rk4State , float deployAngle, float dt) {
+float predictApogee(rk4State a, float deployAngle, float dt) {
   // Predict apogee logic here
-  rk4State state = currState;
+  rk4State state = a;
   Serial.printf("Alt: %f\nVy: %f\n", state.y, state.vy);
   int iterations = 0;
   while (state.vy > 0.0f) {
@@ -328,21 +411,37 @@ void flightCoast() {
 
   if (currGpsState.vy < 0) {
       flightState = 4; 
+      desiredMotorPosition = 0;
   }
 
   if (lastRk4Time == 0) {
     lastRk4Time = millis();
   }
 
-  else if (millis() - lastRk4Time > 100){
+  else if (millis() - lastRk4Time > dt * 1000.0f){
     currState = {0, currGpsState.alt, currGpsState.vx, currGpsState.vy};
     
-    float currEstimate = predictApogee(currState, 0, dt);
-    currAirbrakeState = {currEstimate, 0.0f};
+    float currEstimate = predictApogee(currState, currAirbrakeState.deployPct, dt);
+    currAirbrakeState.apoEstimate = currEstimate;
+
+    float error = currEstimate - (TARGET_APOGEE_AGL + launchAltitudeOffset);
+    float deploymentChange = deploymentRatePct * 0.1;
+    if (error >= 5.0f) {
+      
+      if (currAirbrakeState.deployPct + deploymentChange <= 100.0) {
+        currAirbrakeState.deployPct += deploymentChange;
+        desiredMotorPosition = -15 * (currAirbrakeState.deployPct / 100);
+      }
+    }
+    else {
+      if (currAirbrakeState.deployPct - deploymentChange >= 0.0) {
+        currAirbrakeState.deployPct -= deploymentChange;
+        desiredMotorPosition = -15 * (currAirbrakeState.deployPct / 100);
+      }
+    }
     lastRk4Time = millis();
   }
   logSample();
-
 }
 
 void apogee() {
@@ -413,6 +512,12 @@ void handleSerialCommands() {
   } else if (cmd == 's' || cmd == 'S') {
     printStatus();
   }
+  else if (cmd == 't' || cmd == 'T') {
+    testMove();
+  }
+  else if (cmd == 'r' || cmd == 'r') {
+    testRk4();
+  }
 }
 
 void dumpLog() {
@@ -448,4 +553,18 @@ void printStatus() {
     state == WAITING_FOR_LAUNCH ? "WAITING" :
     state == LOGGING ? "LOGGING" : "IDLE");
   Serial.printf("Log exists: %s\n", LittleFS.exists(LOG_FILE) ? "yes" : "no");
+}
+
+void testMove() {
+  Serial.println("test move disabled");
+  // flightState = 3;
+  // currState = {0, 5446.0f, 60.0f, 403.33f};
+}
+
+void testRk4() {
+  rk4State copy = currState;
+  copy = {0, 5446.0f, 60.0f, 403.33f};
+  float estimate = predictApogee(copy, 0.0f, dt);
+  Serial.print("apoest: ");
+  Serial.println(estimate);
 }

@@ -5,7 +5,7 @@ import json
 # Example: data = np.genfromtxt('cd_curve.csv', delimiter=',')
 # Here we simulate some transonic drag rise data
 
-config_path = 'configs/4inAD.json'
+config_path = 'configs/competition_rocket_2026.json'
 with open(config_path, 'r') as f:
     config = json.load(f)
 
@@ -25,7 +25,7 @@ mach_points = aero_data[mach_mask, 0]
 cd_points   = aero_data[mach_mask, 2]
 
 weather_data = np.genfromtxt(weather_file_path, delimiter=',', skip_header=1)
-alt_mask = weather_data[:,4] <= 6000
+alt_mask = weather_data[:,4] <= 15000
 alt_points = weather_data[alt_mask, 4]
 pressure_points = weather_data[alt_mask, 3]
 temp_points = weather_data[alt_mask, 5]
