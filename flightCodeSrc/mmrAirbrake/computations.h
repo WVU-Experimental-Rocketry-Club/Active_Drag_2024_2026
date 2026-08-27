@@ -12,7 +12,7 @@ struct rk4State {
     float vy;
 };
 
-std::array<float, 2> get_acceleration_2d(float altitude, float velocity_x, float velocity_y, float mass, float deployAngle);
+std::array<float, 2> get_acceleration_2d(float altitude, float velocity_x, float velocity_y, float mass, float deployPct);
 
 float get_isa_pressure(float altitude);
 float get_isa_temperature(float altitude);
@@ -24,9 +24,9 @@ float get_temperature(float altitude);
 float get_density(float altitude);  
 float get_speed_of_sound(float altitude);
 
-float get_total_drag(float velocity, float altitude, float deployAngle);
-float get_brake_drag(float velocity, float altitude, float deployAngle);
-float get_body_drag(float velocity, float altitude, float deployAngle);
+float get_total_drag(float velocity, float altitude, float deployPct);
+float get_brake_drag(float velocity, float altitude, float deployPct);
+float get_body_drag(float velocity, float altitude, float deployPct);
 
-rk4State rk4_step(rk4State state, float dt, float deployAngle);
+rk4State rk4_step(rk4State state, float dt, float deployPct);
 

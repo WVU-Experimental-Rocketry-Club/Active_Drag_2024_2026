@@ -33,20 +33,31 @@ import time as timer
 _weather_data = None
 _use_weather = False
 
+# plain numpy copies of the weather columns, with units already converted.
+# np.interp against a pandas column re-extracts the array on every call, which
+# adds up fast inside the RK4 loops - so we pull them out once here.
+_weather_alt_m = None
+_weather_pres_pa = None
+_weather_temp_k = None
+
 def load_weather_data(weather_data):
     """
     Set weather data for atmospheric calculations.
-    
+
     Args:
         weather_data: DataFrame or path to CSV file
     """
-    global _weather_data, _use_weather
-    
+    global _weather_data, _use_weather, _weather_alt_m, _weather_pres_pa, _weather_temp_k
+
     if isinstance(weather_data, pd.DataFrame):
         _weather_data = weather_data
     else:
         _weather_data = pd.read_csv(weather_data)
-    
+
+    _weather_alt_m = _weather_data['geopotential height_m'].to_numpy(dtype=float)
+    _weather_pres_pa = _weather_data['pressure_hPa'].to_numpy(dtype=float) * 100  # hPa to Pa
+    _weather_temp_k = _weather_data['temperature_C'].to_numpy(dtype=float) + 273.15  # C to K
+
     _use_weather = True
     # print(f"Loaded weather data with {len(_weather_data)} altitude points")
 
@@ -55,9 +66,21 @@ def use_isa_model():
     global _use_weather
     _use_weather = False
 
+def atm_properties(altitude):
+    """
+    Returns (pressure Pa, temperature K, density kg/m^3, speed of sound m/s) in one
+    call. The drag functions need all four, and getting them through the individual
+    functions repeats the same altitude interpolation up to six times per call.
+    """
+    pressure = atm_pressure(altitude)
+    temperature = atm_temperature(altitude)
+    density = pressure / (287.058 * temperature)
+    sound_speed = (1.4 * 287.05 * temperature) ** 0.5
+    return pressure, temperature, density, sound_speed
+
 def atm_pressure(altitude):
     if _use_weather and _weather_data is not None:
-        return np.interp(altitude, _weather_data['geopotential height_m'], _weather_data['pressure_hPa']) * 100  # convert hPa to Pa
+        return np.interp(altitude, _weather_alt_m, _weather_pres_pa)
     else:
         # ISA model
         P0 = 101325  # Pa at sea level
@@ -99,9 +122,9 @@ def atm_density(altitude):
         h = altitude
         rho = rho_b * ((Tb - (h - hb) * Lb) / Tb) ** ((g0 * M) / (R * Lb) - 1)
         return rho
-def atm_temperature(altitude):  
+def atm_temperature(altitude):
     if _use_weather and _weather_data is not None:
-        return np.interp(altitude, _weather_data['geopotential height_m'], _weather_data['temperature_C']) + 273.15  # Convert °C to K
+        return np.interp(altitude, _weather_alt_m, _weather_temp_k)
     else:
         # ISA model
         Tb = 288.15     # K at sea level

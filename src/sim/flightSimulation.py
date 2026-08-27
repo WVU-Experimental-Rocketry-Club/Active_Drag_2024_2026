@@ -187,15 +187,22 @@ def run_simulation(rocketConfig, cd_array, airbrakes_enabled):
     drag_args = [cd_array, 0, diameter, brakeFaceArea]
     
     deployment_started = False
-    
+    progress_v0 = burnout_vy
+
     ### Simulation loop
         # 2D simulation
     state = [burnout_altitude, burnout_vy, 0, burnout_vx]
-    
+
     while state[1] >= 0:  # While vy >= 0
         state = runge_kutta_2d(state, accel_consts, drag_args, dt)
-        
+
         n += 1
+        # single line progress bar. vy falls from burnout velocity to 0 at apogee,
+        # so the fraction of vertical velocity shed works as a progress estimate
+        if n % 25 == 0:
+            frac = max(0.0, 1.0 - state[1] / progress_v0)
+            bars = int(frac * 30)
+            print("\r[{}{}] {:3.0f}%".format("#" * bars, "." * (30 - bars), frac * 100), end="", flush=True)
         time_array.append(n * dt + burnout_time)
         altitude.append(state[0])
         vertical_velocity_array.append(state[1])
@@ -231,6 +238,8 @@ def run_simulation(rocketConfig, cd_array, airbrakes_enabled):
             print(f"Brake Deployment Altitude: {state[0]:.0f} m")
             print(f"--------------------------------------\n\n")
     
+    print("\r[{}] 100%".format("#" * 30), flush=True)
+
     output = np.array([time_array, altitude, vertical_velocity_array, horizontal_velocity_array, horizontal_position_array, acceleration, percent_deploy, deploy_angle, brake_force_array])
-    
+
     return output

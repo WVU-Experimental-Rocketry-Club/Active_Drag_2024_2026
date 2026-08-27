@@ -47,6 +47,7 @@ import os
 import sys
 import json
 from pathlib import Path
+from datetime import datetime
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -171,6 +172,7 @@ class SimulationRunner:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         self.config = None
+        self.aero_data = None
         self.results = {
             'baseline': None,
             'active_drag': None
@@ -188,30 +190,25 @@ class SimulationRunner:
     
     def load_aero_data(self):
         """
-        Load aerodynamic drag coefficient data.
-        
-        Returns:
-            np.ndarray: Drag coefficient lookup table
+        Load the RASAero drag table and the weather sounding for this config.
+        Only loads once - repeat calls reuse what's already in memory.
         """
-        # TODO: Implement loading from Excel/CSV files
-        # For now, return None - will be implemented when integrating legacy code
+        if self.aero_data is not None:
+            return self.aero_data
 
-        results_file = 'legacy/activeDrag_mach_cd_Comp.xlsx'
-        cd_base  = pd.read_excel(results_file, skiprows=8, nrows=11, usecols='D')['Cd'].tolist()
-        cd_fb50  = pd.read_excel(results_file, skiprows=8, nrows=11, usecols='H')['Cd.1'].tolist()
-        cd_fb100 = pd.read_excel(results_file, skiprows=8, nrows=11, usecols='L')['Cd.2'].tolist()
-        self.cd_fb = np.array([cd_base, cd_fb50, cd_fb100]).transpose()
-
-        aero_file = self.config["file_paths"]["aero_file"]
-        self.aero_file = pd.read_csv(aero_file)
+        # keep the CD table as plain numpy arrays instead of a DataFrame. np.interp
+        # hits these thousands of times per apogee prediction and pulling the arrays
+        # out of pandas on every call was a big chunk of the sim runtime
+        aero_file = pd.read_csv(self.config["file_paths"]["aero_file"])
+        self.aero_data = {'Mach': aero_file['Mach'].to_numpy(dtype=float),
+                          'CD': aero_file['CD'].to_numpy(dtype=float)}
 
         # Configure atmosphere module with weather data
         weather_file = self.config["file_paths"]["weather_file"]
-        self.weather_data = pd.read_csv(weather_file)
-        atmosphere.load_weather_data(self.weather_data)
+        atmosphere.load_weather_data(pd.read_csv(weather_file))
         # atmosphere.use_isa_model()  # Use ISA for now
-        
-        return self.aero_file
+
+        return self.aero_data
     
     def run_baseline_simulation(self):
         """
@@ -311,52 +308,100 @@ class SimulationRunner:
         axs[0, 2].legend(["Maximum allowed brake force", "Base", "Airbrake Force (N)"])
         axs[0, 2].grid()
         plt.show()
-        
-    
+
+        # once the plot window is closed, offer to save the run
+        try:
+            answer = input("Save these results? (y/n): ")
+        except EOFError:
+            answer = ""
+        if answer.strip().lower().startswith("y"):
+            self.save_results(fig)
+
+    def save_results(self, fig):
+        """
+        Save everything needed to trace a run later: the plots, the full
+        trajectories from both sims, and a summary of the config and results.
+        All files share one timestamped name in the output directory.
+        """
+        timestamp = datetime.now().strftime("%m-%d-%Y_%H_%M_%S")
+        base = str(self.output_dir / "{}_{}".format(self.config_path.stem, timestamp))
+
+        fig.savefig(base + ".png", dpi=200)
+
+        columns = "time_s,altitude_m,vertical_velocity_ms,horizontal_velocity_ms,horizontal_position_m,acceleration_ms2,deploy_percent,deploy_angle_deg,brake_force_N"
+        np.savetxt(base + "_baseline.csv", np.transpose(self.results['baseline']), fmt="%.4f", delimiter=",", header=columns, comments="")
+        np.savetxt(base + "_airbrakes.csv", np.transpose(self.results['active_drag']), fmt="%.4f", delimiter=",", header=columns, comments="")
+
+        with open(base + "_summary.txt", "w") as f:
+            f.write(self.run_summary() + "\n")
+
+        print("Saved plots, trajectories, and summary to {}*".format(base))
+
+
     def export_results(self):
         """Export simulation results to CSV files"""
     
+    def run_summary(self):
+        """
+        Build the post-run summary text: what was run, then the apogee results.
+        Printed to the terminal after every run, and written to the summary file
+        when the user saves results, so the two always match.
+        """
+        launch_altitude = self.config["simulation_parameters"]["launch_altitude"]
+        ads = self.config["active_drag_system"]
+
+        projected_apogee_ASL = self.results['baseline'][1,-1]
+        projected_apogee_AGL = projected_apogee_ASL - launch_altitude
+        target_apogee_AGL = ads["target_apogee_AGL"]
+        target_apogee_ASL = launch_altitude + target_apogee_AGL
+        airbrakeApogeeASL = self.results['active_drag'][1,-1]
+        airbrakeApogeeAGL = airbrakeApogeeASL - launch_altitude
+        apogeeReduction = projected_apogee_ASL - airbrakeApogeeASL
+        apogeeError = airbrakeApogeeASL - target_apogee_ASL
+
+        lines = []
+        lines.append("--------------------------------------")
+        lines.append("Run info:")
+        lines.append("Config: {} ({})".format(self.config_path.name, self.config.get("rocket_name", "unnamed")))
+        lines.append("Ran: {}".format(datetime.now().strftime("%m-%d-%Y %H:%M:%S")))
+        lines.append("Aero data: {}".format(self.config["file_paths"]["aero_file"]))
+        lines.append("Weather data: {}".format(self.config["file_paths"]["weather_file"]))
+        lines.append("Burnout mass: {} kg, diameter: {} m".format(self.config["mass_properties"]["burnout_mass"], self.config["dimensions"]["diameter"]))
+        lines.append("Brake face area: {} m^2, max brake force: {} N".format(ads["brake_face_area"], ads["max_brake_force"]))
+        lines.append("Deployment: {}-{}%, full deploy in {} s, max mach {}".format(ads["min_deployment"], ads["max_deployment"], ads["full_deploy_time"], ads["deployment_conditions"]["maximum_mach"]))
+
+        lines.append("")
+        lines.append("--------------------------------------")
+        lines.append("Metric:")
+        lines.append("Projected Apogee: {:0.0f} m ({:0.0f} m AGL)".format(projected_apogee_ASL, projected_apogee_AGL))
+        lines.append("Target Apogee: {:0.0f} m ({:0.0f} m AGL)".format(target_apogee_ASL, target_apogee_AGL))
+        lines.append("Apogee With Airbrakes (ASL): {:0.0f} m".format(airbrakeApogeeASL))
+        lines.append("Apogee With Airbrakes (AGL): {:0.0f} m".format(airbrakeApogeeAGL))
+        lines.append("Apogee Reduction (Folding Brake): {:0.0f} m".format(apogeeReduction))
+        lines.append("Apogee Error: {:0.0f} m".format(apogeeError))
+
+        lines.append("")
+        lines.append("--------------------------------------")
+        lines.append("Imperial:")
+        lines.append("Projected Apogee: {:0.0f} ft ({:0.0f} ft AGL)".format(projected_apogee_ASL * 3.28084, projected_apogee_AGL * 3.28084))
+        lines.append("Target Apogee: {:0.0f} ft ({:0.0f} ft AGL)".format(target_apogee_ASL * 3.28084, target_apogee_AGL * 3.28084))
+        lines.append("Apogee With Airbrakes (ASL): {:0.0f} ft".format(airbrakeApogeeASL * 3.28084))
+        lines.append("Apogee With Airbrakes (AGL): {:0.0f} ft".format(airbrakeApogeeAGL * 3.28084))
+        lines.append("Apogee Reduction (Folding Brake): {:0.0f} ft".format(apogeeReduction * 3.28084))
+        lines.append("Apogee Error: {:0.0f} ft".format(apogeeError * 3.28084))
+
+        lines.append("")
+        lines.append("--------------------------------------")
+        lines.append("Brake Deployment (Folding Brake): {:0.0f}%".format(self.results['active_drag'][6,-1]))
+        lines.append("Brake Deployment Angle (Folding Brake): {:0.0f} degrees".format(self.results['active_drag'][7,-1]))
+
+        return "\n".join(lines)
+
     def print_summary(self):
         """Print statistical summary of simulation results"""
-        # TODO: Calculate and print:
-        # - Max altitude (baseline vs active drag)
-        # - Burnout velocity
-        # - Apogee prediction accuracy
-        # - Deployment statistics (max, mean, time spent deployed)
-        projected_apogee_ASL = self.results['baseline'][1,-1]
-        projected_apogee_AGL = projected_apogee_ASL - self.config["simulation_parameters"]["launch_altitude"]
-        target_apogee_ASL = self.config["simulation_parameters"]["launch_altitude"] + self.config["active_drag_system"]["target_apogee_AGL"]
-        target_apogee_AGL = self.config["active_drag_system"]["target_apogee_AGL"]
-        airbrakeApogeeASL = self.results['active_drag'][1,-1]
-        airbrakeApogeeAGL = self.results['active_drag'][1,-1] - self.config["simulation_parameters"]["launch_altitude"]
-        apogeeReduction = self.results['baseline'][1,-1] - self.results['active_drag'][1,-1]
-        apogeeError = self.results['active_drag'][1,-1] - (self.config["simulation_parameters"]["launch_altitude"] + self.config["active_drag_system"]["target_apogee_AGL"])
+        print("\n" + self.run_summary())
 
 
-        print("\n--------------------------------------")
-        print("Metric:")
-        print("Projected Apogee: {:0.0f} m ({:0.0f} m AGL)".format(projected_apogee_ASL, projected_apogee_AGL))
-        print("Target Apogee: {:0.0f} m ({:0.0f} m AGL)".format(target_apogee_ASL, target_apogee_AGL))
-        print("Apogee With Airbrakes (ASL): {:0.0f} m".format(airbrakeApogeeASL))
-        print("Apogee With Airbrakes (AGL): {:0.0f} m".format(airbrakeApogeeAGL))
-        print("Apogee Reduction (Folding Brake): {:0.0f} m".format(apogeeReduction))
-        print("Apogee Error: {:0.0f} m".format(apogeeError))
-
-        print("\n--------------------------------------")
-        print("Imperial:")
-        print("Projected Apogee: {:0.0f} ft ({:0.0f} ft AGL)".format(projected_apogee_ASL * 3.28084, projected_apogee_AGL * 3.28084))
-        print("Target Apogee: {:0.0f} ft ({:0.0f} ft AGL)".format(target_apogee_ASL * 3.28084, target_apogee_AGL * 3.28084))
-        print("Apogee With Airbrakes (ASL): {:0.0f} ft".format(airbrakeApogeeASL * 3.28084))
-        print("Apogee With Airbrakes (AGL): {:0.0f} ft".format(airbrakeApogeeAGL * 3.28084))
-        print("Apogee Reduction (Folding Brake): {:0.0f} ft".format(apogeeReduction * 3.28084))
-        print("Apogee Error: {:0.0f} ft".format(apogeeError * 3.28084))
-        print("\n--------------------------------------")
-
-        print("Brake Deployment (Folding Brake): {:0.0f}%".format(self.results['active_drag'][6,-1]))
-        print("Brake Deployment Angle (Folding Brake): {:0.0f} degrees".format(self.results['active_drag'][7,-1]))
-
-        
-    
     def run_full_analysis(self, plot=True):
         """
         Run complete analysis: baseline, active drag, plotting, export.

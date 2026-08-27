@@ -1,4 +1,4 @@
 numpy
 pandas
 matplotlib
-openpyxl
+# openpyxl is only needed for the old script in legacy/
