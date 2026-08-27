@@ -70,7 +70,7 @@ static const float BALLOON_TEMP_LUT[] = {{
 """
 
 # 3. Write to file
-with open("flightCodeSrc/mothmansRevenge/config_data.h", "w") as f:
+with open("flightCodeSrc/mmrAirbrake/config_data.h", "w") as f:
     f.write(header_content)
 
 print("Successfully generated config_data.h")

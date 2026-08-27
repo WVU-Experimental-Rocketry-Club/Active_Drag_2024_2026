@@ -8,35 +8,35 @@
         "nose_cone_length": 0.4
     },
     "mass_properties": {
-        "burnout_mass": 39.58
+        "burnout_mass": 40.48
     },
     "file_paths": {
         "aero_file": "data/aero/irec2026_rasaero.CSV",
-        "weather_file": "data/weather/kansas2026am.csv"
+        "weather_file": "data/weather/2026061618-72265_IREC26Flight.csv"
     },
     "simulation_parameters": {
         "time_step": 0.1,
         "max_simulation_time": 300,
-        "launch_altitude": 893,
-        "burnout_time": 9.44,
-        "burnout_verticalVelocity": 530.3,
-        "burnout_horizontalVelocity": 68.36,
-        "burnout_acceleration": -41.94,
-        "burnout_altitude": 4489.7
+        "launch_altitude": 888,
+        "burnout_time": 13.1,
+        "burnout_verticalVelocity": 382.52,
+        "burnout_horizontalVelocity": 61.26,
+        "burnout_acceleration": -23.4,
+        "burnout_altitude": 6085.0
     },
     "active_drag_system": {
         "enabled": true,
         "brake_face_area_2x3": 0.015483871,
-        "brake_face_area": 0.0252258,
+        "brake_face_area": 0.01899918781,
         "brake_face_area_5x3": 0.0232258,
         "target_apogee_AGL2": 9144,
-        "target_apogee_AGL": 9545.0,
+        "target_apogee_AGL": 9698.7,
         "control_frequency": 10,
         "max_brake_force2": 1112.06,
         "max_brake_force": 1000,
         "max_deployment": 100,
         "min_deployment": 50,
-        "full_deploy_time": 0.75,
+        "full_deploy_time": 1.5,
         "deployment_conditions": {
             "min_time_after_burnout": 1.0,
             "maximum_mach":0.95

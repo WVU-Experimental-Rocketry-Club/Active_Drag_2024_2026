@@ -8,7 +8,7 @@
         "nose_cone_length": 0.4
     },
     "mass_properties": {
-        "burnout_mass": 11.8
+        "burnout_mass": 9.63
     },
     "file_paths": {
         "aero_file": "data/aero/4inAD.CSV",
@@ -17,17 +17,17 @@
     "simulation_parameters": {
         "time_step": 0.1,
         "max_simulation_time": 300,
-        "launch_altitude": 304,
-        "burnout_time": 4,
-        "burnout_verticalVelocity": 308.85,
-        "burnout_horizontalVelocity": 53.3,
-        "burnout_acceleration": -32.88,
-        "burnout_altitude": 1110
+        "launch_altitude": 0,
+        "burnout_time": 0.75,
+        "burnout_verticalVelocity": 131.85,
+        "burnout_horizontalVelocity": 2.2,
+        "burnout_acceleration": -14.9,
+        "burnout_altitude": 56.8
     },
     "active_drag_system": {
         "enabled": true,
         "brake_face_area": 0.013064,
-        "target_apogee_AGL": 3048.0,
+        "target_apogee_AGL": 600,
         "control_frequency": 10,
         "full_deploy_time": 3.5,
         "max_brake_force": 222,

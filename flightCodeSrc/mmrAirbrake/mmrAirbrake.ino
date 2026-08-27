@@ -5,7 +5,7 @@
 #include <LittleFS.h>
 
 #include <SparkFun_u-blox_GNSS_v3.h>  //http://librarymanager/All#SparkFun_u-blox_GNSS_v3
-#include "SparkFun_BNO08x_Arduino_Library.h"
+// #include "SparkFun_BNO08x_Arduino_Library.h"
 
 #include "EasyBuzzer.h"
 
@@ -16,7 +16,7 @@ unsigned long baudrate = 115200;
 
 ODriveUART odrive(odrive_serial);
 
-const float VEL_LIMIT   = 35.0f;   // turns/sec   - gentle speed
+const float VEL_LIMIT   = 25.0f;   // turns/sec   - gentle speed
 const float ACCEL_LIMIT = 250.0f;  // turns/sec²  - gentle acceleration
 const float DECEL_LIMIT = 100.0f;  // turns/sec²  - gentle deceleration
 
@@ -35,11 +35,11 @@ File logFile;
 uint32_t lastLogTime   = 0;
 
 // Define the pin your buzzer's positive (longer) leg or signal wire is connected to
-const int BUZZER_PIN = 9; 
+const int BUZZER_PIN = 2; 
 
 // Create the BNO085 object
-BNO08x imu;  // -1 means we aren't using a hardware reset pin
-sh2_SensorValue_t sensorValue;
+// BNO08x imu;  // -1 means we aren't using a hardware reset pin
+// sh2_SensorValue_t sensorValue;
 
 SFE_UBLOX_GNSS myGNSS;  // SFE_UBLOX_GNSS uses I2C. For Serial or SPI, see Example2 and Example3
 
@@ -125,6 +125,9 @@ airbrakeState currAirbrakeState = {0.0f, 0.0f}; //deploypct, apoestimate
 
 bool newGpsData = false;
 
+unsigned long testMoveTimer = 0;
+bool testMoveInit = 0;
+
 void setup() {
     // Initialization code here
     Serial.begin(115200);
@@ -162,10 +165,10 @@ void setup() {
 
 
     // // bno085 --------------------------------
-    imu.begin(0x4A, Wire);
-    imu.enableAccelerometer(100);
-    imu.enableGyro(100);
-    imu.enableMagnetometer(100);
+    // imu.begin(0x4A, Wire);
+    // imu.enableAccelerometer(100);
+    // imu.enableGyro(100);
+    // imu.enableMagnetometer(100);
 
 
           // Mount filesystem
@@ -217,8 +220,8 @@ void setup() {
     while (odrive.getState() != AXIS_STATE_CLOSED_LOOP_CONTROL) {
       odrive.clearErrors();
       odrive.setState(AXIS_STATE_CLOSED_LOOP_CONTROL);
-      Serial.println("config axis state");
-      delay(10);
+      // Serial.println("config axis state");
+      delay(100);
     }
 }
 
@@ -247,13 +250,17 @@ void loop() {
       Serial.print(feedback.vel);
       Serial.println();
       }
-      if (desiredMotorPosition <=0.0f && desiredMotorPosition >= -15.0f) {
+      if (desiredMotorPosition <=0.0f && desiredMotorPosition >= -13.0f) {
         odrive.setPosition(desiredMotorPosition);
       }
       else {
         odrive.setPosition(0);
       }
-
+      if (testMoveInit && millis() - testMoveTimer >= 1000) {
+  desiredMotorPosition = 0.0f;
+  testMoveInit = false;
+  Serial.println("test move: retracted");
+}
 
 
     if        (flightState == 0) {
@@ -331,9 +338,9 @@ void updateSensors() {
 
     uint8_t fixType = myGNSS.getFixType(0); //0 no fix, 3 3d fix
 
-    float horAcc = myGNSS.getHorizontalAccuracy(0);
-    float vertAcc = myGNSS.getVerticalAccuracy(0);
-    float spdAcc = myGNSS.getSpeedAccEst(0);
+    float horAcc = myGNSS.getHorizontalAccuracy(0) / 1000.0f;
+    float vertAcc = myGNSS.getVerticalAccuracy(0) / 1000.0f;
+    float spdAcc = myGNSS.getSpeedAccEst(0) / 1000.0f;
 
     currGpsState = {satellites, fixType, latitude, longitude, hvel, vvel, altitude, horAcc, vertAcc, spdAcc};
   }
@@ -430,13 +437,13 @@ void flightCoast() {
       
       if (currAirbrakeState.deployPct + deploymentChange <= 100.0) {
         currAirbrakeState.deployPct += deploymentChange;
-        desiredMotorPosition = -15 * (currAirbrakeState.deployPct / 100);
+        desiredMotorPosition = -13.0f * (currAirbrakeState.deployPct / 100.0f);
       }
     }
     else {
       if (currAirbrakeState.deployPct - deploymentChange >= 0.0) {
         currAirbrakeState.deployPct -= deploymentChange;
-        desiredMotorPosition = -15 * (currAirbrakeState.deployPct / 100);
+        desiredMotorPosition = -13.0f * (currAirbrakeState.deployPct / 100.0f);
       }
     }
     lastRk4Time = millis();
@@ -556,9 +563,13 @@ void printStatus() {
 }
 
 void testMove() {
-  Serial.println("test move disabled");
-  // flightState = 3;
-  // currState = {0, 5446.0f, 60.0f, 403.33f};
+  Serial.println("test move");
+  if (!testMoveInit) {
+    Serial.println("test move: deploying");
+    testMoveInit = true;
+    testMoveTimer = millis();
+    desiredMotorPosition = -13.0f;
+  }
 }
 
 void testRk4() {

@@ -81,7 +81,7 @@ def getTotalDrag(cd_array, velocity, percent_deploy, altitude, diameter, brakeFa
     q = pressure * (1 + (((gamma - 1)/2) * mach_num**2))**(gamma/(gamma - 1)) - pressure # total pressure - pressure  # dynamic pressure
 
     AdeployedBrakes = brakeFaceArea * (percent_deploy / 100.0)
-    FbrakeDrag = q * AdeployedBrakes * 0.85 # 0.85 is an empirical value for folding brakes from Michael Farha's thesis
+    FbrakeDrag = q * AdeployedBrakes * (0.008 * percent_deploy + 0.35) # 0.85 is an empirical value for folding brakes from Michael Farha's thesis
 
     Arocket = np.pi*(diameter/2)**2
     Rocketdrag = np.interp(mach_num, cd_array['Mach'], cd_array['CD'])
@@ -100,7 +100,7 @@ def getBrakeDrag(cd_array, velocity, percent_deploy, altitude, brakeFaceArea):
     q = pressure * (1 + (((gamma - 1)/2) * mach_num**2))**(gamma/(gamma - 1)) - pressure # total pressure - pressure  # dynamic pressure
 
     AdeployedBrakes = brakeFaceArea * (percent_deploy / 100.0)
-    FbrakeDrag = q * AdeployedBrakes * 0.85 # 0.85 is an empirical value for folding brakes from Michael Farha's thesis
+    FbrakeDrag = q * AdeployedBrakes * (0.008 * percent_deploy + 0.35) # 0.85 is an empirical value for folding brakes from Michael Farha's thesis
 
     return FbrakeDrag
 

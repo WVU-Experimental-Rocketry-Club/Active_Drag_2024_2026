@@ -194,7 +194,7 @@ class SimulationRunner:
         axs[0, 0].set_title("Altitude")
         axs[0, 0].set_xlabel("Time (s)")
         axs[0, 0].set_ylabel("Altitude (m)")
-        axs[0, 0].legend(["Projected Apogee","Target Apogee", "Base", "FB"])
+        axs[0, 0].legend(["Projected Apogee","Target Apogee", "Base", "Folding Brake"])
         axs[0, 0].grid()
 
         axs[0, 1].plot(self.results['baseline'][0,:], self.results['baseline'][2,:])
@@ -202,7 +202,7 @@ class SimulationRunner:
         axs[0, 1].set_title("Velocity")
         axs[0, 1].set_xlabel("Time (s)")
         axs[0, 1].set_ylabel("Velocity (m/s)")
-        axs[0, 1].legend(["Base", "FB"])
+        axs[0, 1].legend(["Base", "Folding Brake"])
         axs[0, 1].grid()
 
         axs[1, 0].plot(self.results['baseline'][0,:], self.results['baseline'][5,:])
@@ -210,7 +210,7 @@ class SimulationRunner:
         axs[1, 0].set_title("Acceleration")
         axs[1, 0].set_xlabel("Time (s)")
         axs[1, 0].set_ylabel("Acceleration (m/s^2)")
-        axs[1, 0].legend(["Base", "FB"])
+        axs[1, 0].legend(["Base", "Folding Brake"])
         axs[1, 0].grid()
 
         axs[1, 2].plot(self.results['baseline'][0,:], self.results['baseline'][6,:])
@@ -270,7 +270,7 @@ class SimulationRunner:
         print("Target Apogee: {:0.0f} m ({:0.0f} m AGL)".format(target_apogee_ASL, target_apogee_AGL))
         print("Apogee With Airbrakes (ASL): {:0.0f} m".format(airbrakeApogeeASL))
         print("Apogee With Airbrakes (AGL): {:0.0f} m".format(airbrakeApogeeAGL))
-        print("Apogee Reduction (FB): {:0.0f} m".format(apogeeReduction))
+        print("Apogee Reduction (Folding Brake): {:0.0f} m".format(apogeeReduction))
         print("Apogee Error: {:0.0f} m".format(apogeeError))
 
         print("\n--------------------------------------")
@@ -279,12 +279,12 @@ class SimulationRunner:
         print("Target Apogee: {:0.0f} ft ({:0.0f} ft AGL)".format(target_apogee_ASL * 3.28084, target_apogee_AGL * 3.28084))
         print("Apogee With Airbrakes (ASL): {:0.0f} ft".format(airbrakeApogeeASL * 3.28084))
         print("Apogee With Airbrakes (AGL): {:0.0f} ft".format(airbrakeApogeeAGL * 3.28084))
-        print("Apogee Reduction (FB): {:0.0f} ft".format(apogeeReduction * 3.28084))
+        print("Apogee Reduction (Folding Brake): {:0.0f} ft".format(apogeeReduction * 3.28084))
         print("Apogee Error: {:0.0f} ft".format(apogeeError * 3.28084))
         print("\n--------------------------------------")
 
-        print("Brake Deployment (FB): {:0.0f}%".format(self.results['active_drag'][6,-1]))
-        print("Brake Deployment Angle (FB): {:0.0f} degrees".format(self.results['active_drag'][7,-1]))
+        print("Brake Deployment (Folding Brake): {:0.0f}%".format(self.results['active_drag'][6,-1]))
+        print("Brake Deployment Angle (Folding Brake): {:0.0f} degrees".format(self.results['active_drag'][7,-1]))
 
         
     
@@ -332,8 +332,10 @@ def main():
     parser.add_argument(
         '--config', 
         type=str, 
+        # default='configs/shenandoah_sunrise_irec.json',
         default='configs/competition_rocket_2026.json',
-        # default='configs/4inAD.json',
+        # default='configs/4inAD_k2050.json',
+        # default='configs/4inAD_m2050.json',
         help='Path to configuration JSON file'
     )
     parser.add_argument(

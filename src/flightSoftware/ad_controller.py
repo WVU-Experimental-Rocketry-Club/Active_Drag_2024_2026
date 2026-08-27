@@ -76,7 +76,7 @@ class AirbrakeController:
         config = config or {}
         self.airbrakeMachThreshold = rocketConfig["active_drag_system"]["deployment_conditions"]["maximum_mach"]
         self.deployment_time = rocketConfig["active_drag_system"]["full_deploy_time"]
-        self.error_threshold = config.get('error_threshold', 5.0)
+        self.error_threshold = config.get('error_threshold', 3.0)
         self.control_frequency = config.get('control_frequency', 100.0)
         self.max_deployment = rocketConfig["active_drag_system"]["max_deployment"]
         self.min_deployment = rocketConfig["active_drag_system"]["min_deployment"]
@@ -110,10 +110,10 @@ class AirbrakeController:
         # Check if enough time has passed for controller update
         if time - self.last_update_time < (1.0 / self.control_frequency):
             return self.current_deployment, getBrakeDrag(drag_args[0], state[1], self.current_deployment, state[0], drag_args[3])
-        if self.target_apogee - state[0] > 2000:
+        if self.target_apogee - state[0] > 2500:
             self.error_threshold = 5
-            curr_target_apogee = self.target_apogee + 25
-            prediction_dt = 1
+            curr_target_apogee = self.target_apogee + 50
+            prediction_dt = 0.1
         else:
             self.error_threshold = 5
             curr_target_apogee = self.target_apogee
@@ -143,7 +143,7 @@ class AirbrakeController:
             # Proportional control: more error = faster deployment change
             # Positive error (too high) → increase deployment (more drag)
             # Negative error (too low) → decrease deployment (less drag)
-            deployment_change = self.deployment_rate * (time - self.last_update_time) * min(abs(error) * self.kp, 1.0)
+            deployment_change = self.deployment_rate * (time - self.last_update_time) #* min(abs(error) * self.kp, 1.0)
             
             if error > 0:  # Predicted apogee too high
                 #only deploy brakes if resulting drag is within max brake force

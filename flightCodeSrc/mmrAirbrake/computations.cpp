@@ -95,7 +95,7 @@ float get_total_drag(float velocity, float altitude, float angleDeployed) {
 
     float q = pressure * std::pow(1.0f + (((gamma - 1.0f)/2.0f) * mach * mach), (gamma/(gamma - 1.0f))) - pressure;
     float area_deployed = sin(angleDeployed * (3.14159265f / 180.0f)) * BRAKE_FACE_AREA;
-    float brake_drag = q * area_deployed * 0.85f; // Assume Cd of 0.85 for brakes
+    float brake_drag = q * area_deployed * (0.00889 * angleDeployed + 0.35); // Assume Cd of 0.85 for brakes
 
     const int index = std::lower_bound(AERO_MACH_LUT, AERO_MACH_LUT + AERO_TABLE_SIZE, mach) - AERO_MACH_LUT;
     const float cd = AERO_CD_LUT[std::clamp(index, 0, static_cast<int>(AERO_TABLE_SIZE - 1))];
@@ -113,7 +113,7 @@ float get_brake_drag(float velocity, float altitude, float angleDeployed) {
 
     float q = pressure * std::pow(1 + (((gamma - 1)/2) * mach * mach), (gamma/(gamma - 1))) - pressure;
     float area_deployed = sin(angleDeployed * (3.14159265f / 180.0f)) * BRAKE_FACE_AREA;
-    float brake_drag = q * area_deployed * 0.85f; // Assume Cd of 0.85 for brakes
+    float brake_drag = q * area_deployed * (0.00889 * angleDeployed + 0.35); // Assume Cd of 0.85 for brakes
 
     return brake_drag;
 }

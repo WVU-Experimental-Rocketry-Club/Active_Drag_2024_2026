@@ -1,0 +1,41 @@
+{
+    "rocket_name": "WVU IREC 2026 Rocket",
+    "description": "WVU Competition rocket with ActiveDrag system for 2026 IREC",
+    "dimensions": {
+        "length": 3.5,
+        "diameter": 0.1016,
+        "fin_span": 0.3,
+        "nose_cone_length": 0.4
+    },
+    "mass_properties": {
+        "burnout_mass": 9.53
+    },
+    "file_paths": {
+        "aero_file": "data/aero/4inAD.CSV",
+        "weather_file": "data/weather/dayton_tmo_01282026.csv"
+    },
+    "simulation_parameters": {
+        "time_step": 0.1,
+        "max_simulation_time": 300,
+        "launch_altitude": 0,
+        "burnout_time": 1.5,
+        "burnout_verticalVelocity": 138.4,
+        "burnout_horizontalVelocity": 3.5,
+        "burnout_acceleration": -15.88,
+        "burnout_altitude": 141
+    },
+    "active_drag_system": {
+        "enabled": true,
+        "brake_face_area": 0.013064,
+        "target_apogee_AGL": 700.0,
+        "control_frequency": 10,
+        "full_deploy_time": 3.5,
+        "max_brake_force": 222,
+        "max_deployment": 100,
+        "min_deployment": 40,
+        "deployment_conditions": {
+            "min_time_after_burnout": 1.0,
+            "maximum_mach": 0.95
+        }
+    }
+}
