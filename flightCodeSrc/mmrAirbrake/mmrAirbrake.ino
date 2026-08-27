@@ -284,13 +284,13 @@ void loop1() {
 
 }
 
-float predictApogee(rk4State a, float deployAngle, float dt) {
+float predictApogee(rk4State a, float deployPct, float dt) {
   // Predict apogee logic here
   rk4State state = a;
   Serial.printf("Alt: %f\nVy: %f\n", state.y, state.vy);
   int iterations = 0;
   while (state.vy > 0.0f) {
-    state = rk4_step(state, dt, deployAngle);
+    state = rk4_step(state, dt, deployPct);
     iterations++;
   }
   Serial.printf("Iterations: %d\n", iterations);

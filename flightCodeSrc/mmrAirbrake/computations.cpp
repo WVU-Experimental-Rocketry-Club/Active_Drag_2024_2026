@@ -6,13 +6,13 @@
 #include "config_data.h"
 #include "computations.h"
 
-std::array<float, 2> get_acceleration_2d(float altitude, float velocity_x, float velocity_y, float mass, float deployAngle) {
+std::array<float, 2> get_acceleration_2d(float altitude, float velocity_x, float velocity_y, float mass, float deployPct) {
     // Constants
     const float g = 9.80665f; // gravitational acceleration in m/s^2
 
     // Calculate speed and drag force
     float velocity = std::sqrt(velocity_x * velocity_x + velocity_y * velocity_y);
-    float dragForce = get_total_drag(velocity, altitude, deployAngle); // Assume full deployment for drag calculation
+    float dragForce = get_total_drag(velocity, altitude, deployPct);
 
     // Calculate acceleration components
     float accel_x = - (dragForce / mass) * (velocity_x / velocity); // Drag deceleration in x
@@ -86,7 +86,7 @@ float get_speed_of_sound(float altitude) {
     return speed_of_sound;
 }
 
-float get_total_drag(float velocity, float altitude, float angleDeployed) {
+float get_total_drag(float velocity, float altitude, float deployPct) {
     float pressure = get_pressure(altitude);
     float rho = get_density(altitude);
     float gamma = 1.4f;
@@ -94,8 +94,14 @@ float get_total_drag(float velocity, float altitude, float angleDeployed) {
     float mach = velocity / C;
 
     float q = pressure * std::pow(1.0f + (((gamma - 1.0f)/2.0f) * mach * mach), (gamma/(gamma - 1.0f))) - pressure;
-    float area_deployed = sin(angleDeployed * (3.14159265f / 180.0f)) * BRAKE_FACE_AREA;
-    float brake_drag = q * area_deployed * (0.00889 * angleDeployed + 0.35); // Assume Cd of 0.85 for brakes
+    // percent deploy is linear in projected area, so the flap angle is the arcsin.
+    // Brake Cd fit is a function of flap angle (0.35 stowed to 1.15 at 90 deg).
+    // Matches getTotalDrag in the python sim
+    if (deployPct < 0.0f) deployPct = 0.0f;
+    if (deployPct > 100.0f) deployPct = 100.0f;
+    float deploy_angle = std::asin(deployPct / 100.0f) * (180.0f / 3.14159265f);
+    float area_deployed = (deployPct / 100.0f) * BRAKE_FACE_AREA;
+    float brake_drag = q * area_deployed * (0.00889f * deploy_angle + 0.35f);
 
     const int index = std::lower_bound(AERO_MACH_LUT, AERO_MACH_LUT + AERO_TABLE_SIZE, mach) - AERO_MACH_LUT;
     const float cd = AERO_CD_LUT[std::clamp(index, 0, static_cast<int>(AERO_TABLE_SIZE - 1))];
@@ -104,16 +110,19 @@ float get_total_drag(float velocity, float altitude, float angleDeployed) {
 
     return brake_drag + body_drag;
 }
-float get_brake_drag(float velocity, float altitude, float angleDeployed) {
+float get_brake_drag(float velocity, float altitude, float deployPct) {
     float pressure = get_pressure(altitude);
-    float rho = get_density(altitude);
     float gamma = 1.4f;
     float C = get_speed_of_sound(altitude);
     float mach = velocity / C;
 
     float q = pressure * std::pow(1 + (((gamma - 1)/2) * mach * mach), (gamma/(gamma - 1))) - pressure;
-    float area_deployed = sin(angleDeployed * (3.14159265f / 180.0f)) * BRAKE_FACE_AREA;
-    float brake_drag = q * area_deployed * (0.00889 * angleDeployed + 0.35); // Assume Cd of 0.85 for brakes
+    // same brake model as get_total_drag: area linear in percent, Cd fit vs flap angle
+    if (deployPct < 0.0f) deployPct = 0.0f;
+    if (deployPct > 100.0f) deployPct = 100.0f;
+    float deploy_angle = std::asin(deployPct / 100.0f) * (180.0f / 3.14159265f);
+    float area_deployed = (deployPct / 100.0f) * BRAKE_FACE_AREA;
+    float brake_drag = q * area_deployed * (0.00889f * deploy_angle + 0.35f);
 
     return brake_drag;
 }
@@ -130,8 +139,8 @@ float get_body_drag(float velocity, float altitude) {
     return body_drag;
 }
 
-rk4State rk4_step(rk4State state, float dt, float deployAngle) {
-    auto acceleration = get_acceleration_2d(state.y, state.vx, state.vy, ROCKET_MASS, deployAngle);
+rk4State rk4_step(rk4State state, float dt, float deployPct) {
+    auto acceleration = get_acceleration_2d(state.y, state.vx, state.vy, ROCKET_MASS, deployPct);
 
     rk4State k1;
     k1.x = state.vx;
@@ -144,7 +153,7 @@ rk4State rk4_step(rk4State state, float dt, float deployAngle) {
     tempState.y = state.y + 0.5f * dt * k1.y;
     tempState.vx = state.vx + 0.5f * dt * k1.vx;
     tempState.vy = state.vy + 0.5f * dt * k1.vy;
-    acceleration = get_acceleration_2d(tempState.y, tempState.vx, tempState.vy, ROCKET_MASS, deployAngle);
+    acceleration = get_acceleration_2d(tempState.y, tempState.vx, tempState.vy, ROCKET_MASS, deployPct);
 
     rk4State k2;
     k2.x = tempState.vx;
@@ -156,7 +165,7 @@ rk4State rk4_step(rk4State state, float dt, float deployAngle) {
     tempState.y = state.y + 0.5f * dt * k2.y;
     tempState.vx = state.vx + 0.5f * dt * k2.vx;
     tempState.vy = state.vy + 0.5f * dt * k2.vy;
-    acceleration = get_acceleration_2d(tempState.y, tempState.vx, tempState.vy, ROCKET_MASS, deployAngle);
+    acceleration = get_acceleration_2d(tempState.y, tempState.vx, tempState.vy, ROCKET_MASS, deployPct);
 
     rk4State k3;
     k3.x = tempState.vx;
@@ -168,7 +177,7 @@ rk4State rk4_step(rk4State state, float dt, float deployAngle) {
     tempState.y = state.y + dt * k3.y;
     tempState.vx = state.vx + dt * k3.vx;
     tempState.vy = state.vy + dt * k3.vy;
-    acceleration = get_acceleration_2d(tempState.y, tempState.vx, tempState.vy, ROCKET_MASS, deployAngle);
+    acceleration = get_acceleration_2d(tempState.y, tempState.vx, tempState.vy, ROCKET_MASS, deployPct);
 
     rk4State k4;
     k4.x = tempState.vx;

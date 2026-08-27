@@ -78,8 +78,13 @@ def getTotalDrag(cd_array, velocity, percent_deploy, altitude, diameter, brakeFa
 
     q = pressure * (1 + (((gamma - 1)/2) * mach_num**2))**(gamma/(gamma - 1)) - pressure # total pressure - pressure  # dynamic pressure
 
+    # percent deploy is linear in projected area, so the flap angle is the arcsin.
+    # The brake Cd fit is a function of flap angle (0.35 stowed to 1.15 at 90 deg,
+    # derived from the 0.85 average for folding brakes in Michael Farha's thesis)
+    percent_deploy = np.clip(percent_deploy, 0.0, 100.0)
+    deploy_angle = np.degrees(np.arcsin(percent_deploy / 100.0))
     AdeployedBrakes = brakeFaceArea * (percent_deploy / 100.0)
-    FbrakeDrag = q * AdeployedBrakes * (0.008 * percent_deploy + 0.35) # 0.85 is an empirical value for folding brakes from Michael Farha's thesis
+    FbrakeDrag = q * AdeployedBrakes * (0.00889 * deploy_angle + 0.35)
 
     Arocket = np.pi*(diameter/2)**2
     Rocketdrag = np.interp(mach_num, cd_array['Mach'], cd_array['CD'])
@@ -95,8 +100,11 @@ def getBrakeDrag(cd_array, velocity, percent_deploy, altitude, brakeFaceArea):
 
     q = pressure * (1 + (((gamma - 1)/2) * mach_num**2))**(gamma/(gamma - 1)) - pressure # total pressure - pressure  # dynamic pressure
 
+    # same brake model as getTotalDrag: area linear in percent, Cd fit vs flap angle
+    percent_deploy = np.clip(percent_deploy, 0.0, 100.0)
+    deploy_angle = np.degrees(np.arcsin(percent_deploy / 100.0))
     AdeployedBrakes = brakeFaceArea * (percent_deploy / 100.0)
-    FbrakeDrag = q * AdeployedBrakes * (0.008 * percent_deploy + 0.35) # 0.85 is an empirical value for folding brakes from Michael Farha's thesis
+    FbrakeDrag = q * AdeployedBrakes * (0.00889 * deploy_angle + 0.35)
 
     return FbrakeDrag
 
