@@ -171,6 +171,7 @@ class SimulationRunner:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         self.config = None
+        self.aero_data = None
         self.results = {
             'baseline': None,
             'active_drag': None
@@ -188,30 +189,25 @@ class SimulationRunner:
     
     def load_aero_data(self):
         """
-        Load aerodynamic drag coefficient data.
-        
-        Returns:
-            np.ndarray: Drag coefficient lookup table
+        Load the RASAero drag table and the weather sounding for this config.
+        Only loads once - repeat calls reuse what's already in memory.
         """
-        # TODO: Implement loading from Excel/CSV files
-        # For now, return None - will be implemented when integrating legacy code
+        if self.aero_data is not None:
+            return self.aero_data
 
-        results_file = 'legacy/activeDrag_mach_cd_Comp.xlsx'
-        cd_base  = pd.read_excel(results_file, skiprows=8, nrows=11, usecols='D')['Cd'].tolist()
-        cd_fb50  = pd.read_excel(results_file, skiprows=8, nrows=11, usecols='H')['Cd.1'].tolist()
-        cd_fb100 = pd.read_excel(results_file, skiprows=8, nrows=11, usecols='L')['Cd.2'].tolist()
-        self.cd_fb = np.array([cd_base, cd_fb50, cd_fb100]).transpose()
-
-        aero_file = self.config["file_paths"]["aero_file"]
-        self.aero_file = pd.read_csv(aero_file)
+        # keep the CD table as plain numpy arrays instead of a DataFrame. np.interp
+        # hits these thousands of times per apogee prediction and pulling the arrays
+        # out of pandas on every call was a big chunk of the sim runtime
+        aero_file = pd.read_csv(self.config["file_paths"]["aero_file"])
+        self.aero_data = {'Mach': aero_file['Mach'].to_numpy(dtype=float),
+                          'CD': aero_file['CD'].to_numpy(dtype=float)}
 
         # Configure atmosphere module with weather data
         weather_file = self.config["file_paths"]["weather_file"]
-        self.weather_data = pd.read_csv(weather_file)
-        atmosphere.load_weather_data(self.weather_data)
+        atmosphere.load_weather_data(pd.read_csv(weather_file))
         # atmosphere.use_isa_model()  # Use ISA for now
-        
-        return self.aero_file
+
+        return self.aero_data
     
     def run_baseline_simulation(self):
         """

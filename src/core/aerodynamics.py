@@ -28,7 +28,7 @@ Notes:
 
 import numpy as np
 import pandas as pd
-from src.core.atmosphere import atm_density, atm_pressure, atm_temperature, atm_temperature, speed_of_sound
+from src.core.atmosphere import atm_density, atm_pressure, atm_temperature, speed_of_sound, atm_properties
 import time as timer
 
 # def cd_interp(cd_array, velocity, altitude, percent_deploy):
@@ -72,10 +72,8 @@ import time as timer
 #     return drag
 
 def getTotalDrag(cd_array, velocity, percent_deploy, altitude, diameter, brakeFaceArea):
-    pressure = atm_pressure(altitude) # ps
-    rho = atm_density(altitude) # p
+    pressure, temp, rho, c = atm_properties(altitude)
     gamma = 1.4  # Ratio of specific heats for air
-    c = (speed_of_sound(altitude))
     mach_num = velocity/c
 
     q = pressure * (1 + (((gamma - 1)/2) * mach_num**2))**(gamma/(gamma - 1)) - pressure # total pressure - pressure  # dynamic pressure
@@ -91,10 +89,8 @@ def getTotalDrag(cd_array, velocity, percent_deploy, altitude, diameter, brakeFa
     return totalDrag
 
 def getBrakeDrag(cd_array, velocity, percent_deploy, altitude, brakeFaceArea):
-    pressure = atm_pressure(altitude) # ps
-    rho = atm_density(altitude) # p
+    pressure, temp, rho, c = atm_properties(altitude)
     gamma = 1.4  # Ratio of specific heats for air
-    c = (speed_of_sound(altitude))
     mach_num = velocity/c
 
     q = pressure * (1 + (((gamma - 1)/2) * mach_num**2))**(gamma/(gamma - 1)) - pressure # total pressure - pressure  # dynamic pressure
@@ -105,8 +101,7 @@ def getBrakeDrag(cd_array, velocity, percent_deploy, altitude, brakeFaceArea):
     return FbrakeDrag
 
 def getRocketBodyDrag(cd_array, velocity, altitude, diameter):
-    rho = atm_density(altitude) # p
-    c = (speed_of_sound(altitude))
+    pressure, temp, rho, c = atm_properties(altitude)
     mach_num = velocity/c
 
     Arocket = np.pi*(diameter/2)**2
