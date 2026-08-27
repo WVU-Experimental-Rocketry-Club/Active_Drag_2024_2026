@@ -53,7 +53,8 @@ To sim a new rocket, copy the closest config in `configs/` and update the number
 ```
 main.py                     entry point, run this
 configs/                    one JSON per rocket+motor combo (see configs/README.md)
-data/aero/                  RASAero CSV exports (Mach vs CD)
+data/aero/                  RASAero aero plot exports (Mach vs CD)
+data/flight_sims/           RASAero flight sim exports (for the burnout importer)
 data/weather/               weather balloon soundings, named by date-station
 data/simulation_results/    sim output (not tracked in git)
 src/core/                   atmosphere + drag calculations
@@ -61,6 +62,7 @@ src/sim/                    RK4 integration and the main sim loop
 src/flightSoftware/         airbrake controller (the algorithm the rocket runs)
 flightCodeSrc/              the actual onboard code, see below
 utilities/flightDataFile.py generates config_data.h for the flight code
+utilities/import_rasaero.py fills a config's burnout state from a RASAero export
 legacy/                     the original thesis-based script everything came from
 Post Flight Data/           logs from real flights
 ```
