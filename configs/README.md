@@ -5,7 +5,13 @@ rocket, copy the closest existing config and change the numbers. `main.py` check
 config when it loads and will tell you if anything is missing.
 
 The sim starts at motor burnout, not liftoff. All the `burnout_*` values come from
-RASAero - run your rocket in RASAero and read them off the flight sim output at burnout.
+RASAero. Don't type them in by hand - export the flight sim data from RASAero into
+`data/flight_sims/` and run the importer, which finds burnout and fills them in
+(along with `burnout_mass`), converting to metric:
+
+```
+python utilities/import_rasaero.py data/flight_sims/your_export.CSV configs/your_config.json
+```
 
 ## Files
 
