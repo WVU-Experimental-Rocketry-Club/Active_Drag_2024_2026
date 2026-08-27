@@ -1,6 +1,6 @@
-{
-    "rocket_name": "WVU IREC 2026 Rocket",
-    "description": "WVU Competition rocket with ActiveDrag system for 2026 IREC",
+﻿{
+    "rocket_name": "4in Test Rocket - K1100",
+    "description": "4in ActiveDrag test rocket on a K1100 motor",
     "dimensions": {
         "length": 3.5,
         "diameter": 0.1016,
