@@ -1,0 +1,11 @@
+# python
+__pycache__/
+*.pyc
+
+# c++ build output from the desktop test harness
+*.o
+*.exe
+flightCodeSrc/*/desktop
+
+# sim outputs
+data/simulation_results/
