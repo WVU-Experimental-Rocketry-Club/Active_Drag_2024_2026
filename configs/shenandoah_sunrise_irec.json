@@ -8,30 +8,34 @@
         "nose_cone_length": 0.4
     },
     "mass_properties": {
-        "burnout_mass": 35.87
+        "burnout_mass": 38.15
     },
     "file_paths": {
-        "aero_file": "data/aero/competition_drag_profile.csv"
+        "aero_file": "data/aero/sSunrise.csv",
+        "weather_file": "data/weather/2025_IREC_Weather.csv"
     },
     "simulation_parameters": {
         "time_step": 0.1,
         "max_simulation_time": 300,
         "launch_altitude": 893,
         "burnout_time": 9.901,
-        "burnout_verticalVelocity": 507.79,
-        "burnout_horizontalVelocity": 83.2,
-        "burnout_altitude": 4156.8624
+        "burnout_verticalVelocity": 299.3,
+        "burnout_horizontalVelocity": 60.0,
+        "burnout_acceleration": -16.5,
+        "burnout_altitude": 7204.8
     },
     "active_drag_system": {
         "enabled": true,
-        "target_apogee_AGL2": 9144,
-        "target_apogee_AGL": 7000,
+        "brake_face_area": 0.0252258,
+        "target_apogee_AGL": 9545.0,
         "control_frequency": 10,
-        "max_brake_force2": 1112.06,
-        "max_brake_force": 250,
+        "max_brake_force": 1000,
+        "max_deployment": 100,
+        "min_deployment": 50,
+        "full_deploy_time": 1.5,
         "deployment_conditions": {
             "min_time_after_burnout": 1.0,
-            "maximum_mach": 1.6
+            "maximum_mach":0.95
         }
     }
 }

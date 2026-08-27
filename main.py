@@ -10,54 +10,37 @@ Purpose:
     outputs flight data for analysis.
 
 Usage:
-    python main.py [--config CONFIG_FILE] [--output OUTPUT_DIR] [--plot]
-    
+    python main.py                          (pick a config from a list)
+    python main.py --config configs/competition_rocket_2026.json
+
     Options:
-        --config: Path to JSON configuration file (default: configs/competition_rocket_activedrag.json)
+        --config: Path to JSON configuration file. Leave it off to pick from a list.
         --output: Directory for output files (default: data/simulation_results/)
-        --plot: Generate matplotlib plots comparing baseline vs active drag trajectories
+        --no-plot: Skip the comparison plots
 
-Simulation Modes:
-    1. Baseline: No airbrakes (percent_deploy = 0%) - determines maximum apogee
-    2. Active Drag: Airbrakes controlled to achieve target apogee
-    3. Comparison: Runs both modes and plots side-by-side results
+What it does:
+    1. Loads the rocket config from configs/, plus the aero (RASAero) and weather
+       (balloon sounding) files the config points to
+    2. Runs a baseline simulation from burnout to apogee with no airbrakes
+    3. Runs the same simulation again with the airbrake controller active
+    4. Prints an apogee summary (metric and imperial) and shows comparison plots
 
-Workflow:
-    1. Parse command-line arguments
-    2. Load JSON configuration file (rocket params, motor data, target apogee)
-    3. Load aerodynamic data (drag coefficient tables from data/aero/)
-    4. Run baseline simulation (no brakes)
-    5. Run active drag simulation (with controller)
-    6. Generate comparison plots:
-        - Altitude vs Time
-        - Velocity vs Time  
-        - Deployment Percentage vs Time
-        - Predicted vs Actual Apogee
-    7. Export flight data to CSV (data/simulation_results/)
-    8. Print summary statistics (max altitude, burnout velocity, deployment stats)
+    The sim starts at burnout, not liftoff. Burnout altitude/velocity/time come
+    from the config file (pull them from RASAero for a new rocket).
 
 Configuration Files:
-    - configs/competition_rocket_activedrag.json: Full-scale IREC competition rocket
-    - configs/example_rocket.json: Smaller test rocket (4" diameter, 10k ft target)
+    - configs/competition_rocket_2026.json: 6" IREC 2026 competition rocket
+    - configs/shenandoah_sunrise_irec.json: Shenandoah Sunrise IREC rocket
+    - configs/4inAD_*.json: 4" test rocket, one file per motor
 
 Dependencies:
     - sim.flightSimulation: run_simulation() - main trajectory propagation
     - core.aerodynamics: Load drag coefficient data
     - matplotlib: Plotting and visualization
-    - json: Configuration file parsing
-    - argparse: Command-line interface
-
-Output Files:
-    - baseline_trajectory.csv: Time-series data without airbrakes
-    - active_drag_trajectory.csv: Time-series data with controller
-    - comparison_plot.png: Visual comparison of trajectories
-    - flight_summary.txt: Statistical summary of simulation results
 
 Notes:
-    - TODO: Implement config loading (currently stub)
     - TODO: Integrate state machine for event-driven simulation
     - TODO: Add Monte Carlo mode for uncertainty quantification
-    - TODO: Support batch processing of multiple configurations
 """
 
 import os
@@ -71,6 +54,93 @@ import pandas as pd
 from src.flightSoftware.ad_controller import AirbrakeController
 from src.sim.flightSimulation import run_simulation
 from src.core import atmosphere
+
+
+# Every config key the sim actually reads, with units. If you add a parameter to the
+# sim, add it here too so a config missing it fails with a real error message instead
+# of a KeyError somewhere down in the physics.
+REQUIRED_CONFIG_KEYS = {
+    "dimensions": {
+        "diameter": "m, body tube diameter",
+    },
+    "mass_properties": {
+        "burnout_mass": "kg, mass after motor burnout",
+    },
+    "file_paths": {
+        "aero_file": "path to RASAero csv export",
+        "weather_file": "path to weather balloon sounding csv",
+    },
+    "simulation_parameters": {
+        "time_step": "s, RK4 integration timestep",
+        "launch_altitude": "m ASL, ground level at the launch site",
+        "burnout_time": "s, from RASAero",
+        "burnout_altitude": "m ASL, from RASAero",
+        "burnout_verticalVelocity": "m/s, from RASAero",
+        "burnout_horizontalVelocity": "m/s, from RASAero",
+        "burnout_acceleration": "m/s^2, from RASAero",
+    },
+    "active_drag_system": {
+        "target_apogee_AGL": "m above ground level",
+        "brake_face_area": "m^2, total area of all brake faces",
+        "max_brake_force": "N, structural limit on brake drag",
+        "max_deployment": "%, usually 100",
+        "min_deployment": "%, controller stays stowed until this much brake would still overshoot",
+        "full_deploy_time": "s, actuator time for 0 to 100%",
+        "deployment_conditions": {
+            "maximum_mach": "no deployment above this mach",
+        },
+    },
+}
+
+
+def load_config_file(config_path):
+    """Load a config JSON. utf-8-sig so files saved from notepad/excel still work,
+    and a readable error instead of a traceback if the JSON is malformed."""
+    if not Path(config_path).exists():
+        print("Config file not found: {}".format(config_path))
+        sys.exit(1)
+    try:
+        with open(config_path, 'r', encoding='utf-8-sig') as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        print("\n{} isn't valid JSON: {}".format(config_path, e))
+        print("Usual suspects: a trailing comma after the last item in a section, or a missing quote.")
+        sys.exit(1)
+
+
+def check_config(config, config_path):
+    """Make sure a config file has everything the sim needs before running it.
+    Reports every problem at once instead of crashing on the first missing key."""
+    problems = []
+
+    def check_section(section, required, path):
+        for key, value in required.items():
+            if key not in section:
+                if isinstance(value, dict):
+                    problems.append("missing section {}.{}".format(path, key))
+                else:
+                    problems.append("missing {}.{} ({})".format(path, key, value))
+            elif isinstance(value, dict):
+                check_section(section[key], value, path + "." + key)
+
+    for section_name, required in REQUIRED_CONFIG_KEYS.items():
+        if section_name not in config:
+            problems.append("missing section " + section_name)
+        else:
+            check_section(config[section_name], required, section_name)
+
+    # also make sure the data files the config points to actually exist
+    if "file_paths" in config:
+        for name, filepath in config["file_paths"].items():
+            if not Path(filepath).exists():
+                problems.append("{} points to {} which doesn't exist".format(name, filepath))
+
+    if problems:
+        print("\nProblems with {}:".format(config_path))
+        for problem in problems:
+            print("  - " + problem)
+        print("\nFix the config and rerun. See configs/README.md for what each key means.")
+        sys.exit(1)
 
 
 class SimulationRunner:
@@ -93,9 +163,9 @@ class SimulationRunner:
             output_dir (str or Path): Directory for output files
         """
         self.config_path = Path(config_path)
-        with open(self.config_path, 'r') as f:
-            self.rocketConfig = json.load(f)
+        self.rocketConfig = load_config_file(self.config_path)
 
+        check_config(self.rocketConfig, self.config_path)
 
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -109,12 +179,11 @@ class SimulationRunner:
     def load_config(self):
         """
         Load simulation configuration from JSON file.
-        
+
         Returns:
             dict: Configuration dictionary with rocket parameters, motor data, etc.
         """
-        with open(self.config_path, 'r') as f:
-            self.config = json.load(f)
+        self.config = load_config_file(self.config_path)
         return self.config
     
     def load_aero_data(self):
@@ -137,7 +206,7 @@ class SimulationRunner:
         self.aero_file = pd.read_csv(aero_file)
 
         # Configure atmosphere module with weather data
-        weather_file = 'data/weather/2025_IREC_weather.csv'
+        weather_file = self.config["file_paths"]["weather_file"]
         self.weather_data = pd.read_csv(weather_file)
         atmosphere.load_weather_data(self.weather_data)
         # atmosphere.use_isa_model()  # Use ISA for now
@@ -181,7 +250,12 @@ class SimulationRunner:
         target_apogee_AGL = self.config["active_drag_system"]["target_apogee_AGL"] # meters
         ground_level = self.config["simulation_parameters"]["launch_altitude"] # meters
         target_apogee = ground_level + target_apogee_AGL
-        fig, axs = plt.subplots(2, 2, figsize=(14, 10))
+
+        plt.style.use('default')
+        px = 1/plt.rcParams['figure.dpi']  # pixel in inches
+        fig, axs = plt.subplots(2, 3, constrained_layout=True)
+        fig.set_size_inches(10, 6)
+
         axs[0, 0].plot([0, self.results['baseline'][0,-1]], [self.results['baseline'][1,-1], self.results['baseline'][1,-1]], 'k-.')
         axs[0, 0].plot([0, self.results['baseline'][0,-1]], [target_apogee, target_apogee], 'k--')
         axs[0, 0].plot(self.results['baseline'][0,:], self.results['baseline'][1,:])
@@ -189,7 +263,7 @@ class SimulationRunner:
         axs[0, 0].set_title("Altitude")
         axs[0, 0].set_xlabel("Time (s)")
         axs[0, 0].set_ylabel("Altitude (m)")
-        axs[0, 0].legend(["Projected Apogee","Target Apogee", "Base", "FB"])
+        axs[0, 0].legend(["Projected Apogee","Target Apogee", "Base", "Folding Brake"])
         axs[0, 0].grid()
 
         axs[0, 1].plot(self.results['baseline'][0,:], self.results['baseline'][2,:])
@@ -197,7 +271,7 @@ class SimulationRunner:
         axs[0, 1].set_title("Velocity")
         axs[0, 1].set_xlabel("Time (s)")
         axs[0, 1].set_ylabel("Velocity (m/s)")
-        axs[0, 1].legend(["Base", "FB"])
+        axs[0, 1].legend(["Base", "Folding Brake"])
         axs[0, 1].grid()
 
         axs[1, 0].plot(self.results['baseline'][0,:], self.results['baseline'][5,:])
@@ -205,17 +279,37 @@ class SimulationRunner:
         axs[1, 0].set_title("Acceleration")
         axs[1, 0].set_xlabel("Time (s)")
         axs[1, 0].set_ylabel("Acceleration (m/s^2)")
-        axs[1, 0].legend(["Base", "FB"])
+        axs[1, 0].legend(["Base", "Folding Brake"])
         axs[1, 0].grid()
 
-        axs[1, 1].plot(self.results['baseline'][0,:], self.results['baseline'][6,:], label="_nolegend_")
-        axs[1, 1].plot(self.results['active_drag'][0,:], self.results['active_drag'][6,:])
-        axs[1, 1].set_title("Brake Deployment")
+        axs[1, 2].plot(self.results['baseline'][0,:], self.results['baseline'][6,:])
+        axs[1, 2].plot(self.results['active_drag'][0,:], self.results['active_drag'][6,:])
+        axs[1, 2].set_title("Brake Deployment Percentage")
+        axs[1, 2].set_xlabel("Time (s)")
+        axs[1, 2].set_ylabel("Brake Deployment (%)")
+        axs[1, 2].legend(["Base", "Airbrake Deployment (%)"])
+        axs[1, 2].set_ylim([-10, 110])
+        axs[1, 2].grid()
+
+        axs[1, 1].plot(self.results['baseline'][0,:], self.results['baseline'][6,:])
+        axs[1, 1].plot(self.results['active_drag'][0,:], self.results['active_drag'][7,:])
+        axs[1, 1].set_yticks(range(0, 91, 15))
+        axs[1, 1].set_title("Brake Deployment (deg))")
         axs[1, 1].set_xlabel("Time (s)")
-        axs[1, 1].set_ylabel("Brake Deployment (%)")
-        axs[1, 1].legend(["FB"])
-        axs[1, 1].set_ylim([-10, 110])
+        axs[1, 1].set_ylabel("Brake Deployment (deg)")
+        axs[1, 1].legend(["Base", "Airbrake Deployment (deg)"])
+        axs[1, 1].set_ylim([-10, 100])
         axs[1, 1].grid()
+
+        maxBrakeForce = self.rocketConfig["active_drag_system"]["max_brake_force"]
+        axs[0, 2].plot([0, self.results['active_drag'][0,-1]], [maxBrakeForce, maxBrakeForce], 'k--')
+        axs[0, 2].plot(self.results['baseline'][0,:], self.results['baseline'][8,:])
+        axs[0, 2].plot(self.results['active_drag'][0,:], self.results['active_drag'][8,:])
+        axs[0, 2].set_title("Brake Force")
+        axs[0, 2].set_xlabel("Time (s)")
+        axs[0, 2].set_ylabel("Brake Force (N)")
+        axs[0, 2].legend(["Maximum allowed brake force", "Base", "Airbrake Force (N)"])
+        axs[0, 2].grid()
         plt.show()
         
     
@@ -229,14 +323,37 @@ class SimulationRunner:
         # - Burnout velocity
         # - Apogee prediction accuracy
         # - Deployment statistics (max, mean, time spent deployed)
-        print("Projected Apogee: {:0.0f} m ({:0.0f} m AGL)".format(self.results['baseline'][1,-1], self.results['baseline'][1,-1] - self.config["simulation_parameters"]["launch_altitude"]))
-        print("Target Apogee: {:0.0f} m ({:0.0f} m AGL)".format(self.config["simulation_parameters"]["launch_altitude"] + self.config["active_drag_system"]["target_apogee_AGL"], self.config["active_drag_system"]["target_apogee_AGL"]))
-        print("Apogee With Airbrakes (ASL): {:0.0f} m".format(self.results['active_drag'][1,-1]))
-        print("Apogee With Airbrakes (AGL): {:0.0f} m".format(self.results['active_drag'][1,-1] - self.config["simulation_parameters"]["launch_altitude"]))
-        print("Apogee Reduction (FB): {:0.0f} m".format(self.results['baseline'][1,-1] - self.results['active_drag'][1,-1]))
-        print("Apogee Error: {:0.0f} m".format(self.results['active_drag'][1,-1] - (self.config["simulation_parameters"]["launch_altitude"] + self.config["active_drag_system"]["target_apogee_AGL"])))
+        projected_apogee_ASL = self.results['baseline'][1,-1]
+        projected_apogee_AGL = projected_apogee_ASL - self.config["simulation_parameters"]["launch_altitude"]
+        target_apogee_ASL = self.config["simulation_parameters"]["launch_altitude"] + self.config["active_drag_system"]["target_apogee_AGL"]
+        target_apogee_AGL = self.config["active_drag_system"]["target_apogee_AGL"]
+        airbrakeApogeeASL = self.results['active_drag'][1,-1]
+        airbrakeApogeeAGL = self.results['active_drag'][1,-1] - self.config["simulation_parameters"]["launch_altitude"]
+        apogeeReduction = self.results['baseline'][1,-1] - self.results['active_drag'][1,-1]
+        apogeeError = self.results['active_drag'][1,-1] - (self.config["simulation_parameters"]["launch_altitude"] + self.config["active_drag_system"]["target_apogee_AGL"])
 
-        print("Brake Deployment (FB): {:0.0f}%".format(self.results['active_drag'][6,-1]))
+
+        print("\n--------------------------------------")
+        print("Metric:")
+        print("Projected Apogee: {:0.0f} m ({:0.0f} m AGL)".format(projected_apogee_ASL, projected_apogee_AGL))
+        print("Target Apogee: {:0.0f} m ({:0.0f} m AGL)".format(target_apogee_ASL, target_apogee_AGL))
+        print("Apogee With Airbrakes (ASL): {:0.0f} m".format(airbrakeApogeeASL))
+        print("Apogee With Airbrakes (AGL): {:0.0f} m".format(airbrakeApogeeAGL))
+        print("Apogee Reduction (Folding Brake): {:0.0f} m".format(apogeeReduction))
+        print("Apogee Error: {:0.0f} m".format(apogeeError))
+
+        print("\n--------------------------------------")
+        print("Imperial:")
+        print("Projected Apogee: {:0.0f} ft ({:0.0f} ft AGL)".format(projected_apogee_ASL * 3.28084, projected_apogee_AGL * 3.28084))
+        print("Target Apogee: {:0.0f} ft ({:0.0f} ft AGL)".format(target_apogee_ASL * 3.28084, target_apogee_AGL * 3.28084))
+        print("Apogee With Airbrakes (ASL): {:0.0f} ft".format(airbrakeApogeeASL * 3.28084))
+        print("Apogee With Airbrakes (AGL): {:0.0f} ft".format(airbrakeApogeeAGL * 3.28084))
+        print("Apogee Reduction (Folding Brake): {:0.0f} ft".format(apogeeReduction * 3.28084))
+        print("Apogee Error: {:0.0f} ft".format(apogeeError * 3.28084))
+        print("\n--------------------------------------")
+
+        print("Brake Deployment (Folding Brake): {:0.0f}%".format(self.results['active_drag'][6,-1]))
+        print("Brake Deployment Angle (Folding Brake): {:0.0f} degrees".format(self.results['active_drag'][7,-1]))
 
         
     
@@ -276,16 +393,38 @@ class SimulationRunner:
         return self.results
 
 
+def pick_config():
+    """List the config files in configs/ and let the user pick one by number"""
+    configs = sorted(Path('configs').glob('*.json'))
+    if not configs:
+        print("No config files found in configs/")
+        sys.exit(1)
+
+    print("Available configs:")
+    for i, config_file in enumerate(configs):
+        print("  {}: {}".format(i + 1, config_file.name))
+
+    while True:
+        choice = input("Pick a config (1-{}): ".format(len(configs)))
+        try:
+            index = int(choice) - 1
+            if 0 <= index < len(configs):
+                return str(configs[index])
+        except ValueError:
+            pass
+        print("Enter a number between 1 and {}".format(len(configs)))
+
+
 def main():
     """Main entry point for command-line execution"""
     parser = argparse.ArgumentParser(
         description='Active Drag Rocket Simulation - WVU Experimental Rocketry'
     )
     parser.add_argument(
-        '--config', 
-        type=str, 
-        default='configs/competition_rocket_2026.json',
-        help='Path to configuration JSON file'
+        '--config',
+        type=str,
+        default=None,
+        help='Path to configuration JSON file. Leave it off to pick from a list.'
     )
     parser.add_argument(
         '--output', 
@@ -305,7 +444,10 @@ def main():
     )
     
     args = parser.parse_args()
-    
+
+    if args.config is None:
+        args.config = pick_config()
+
     # Create simulation runner
     runner = SimulationRunner(args.config, args.output)
     

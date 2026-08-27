@@ -74,11 +74,12 @@ class AirbrakeController:
         
         # Controller parameters
         config = config or {}
-        self.airbrakeMachThreshold = config.get('airbrakeMachThreshold', 2.0)
-        self.deployment_time = config.get('deployment_time', 3.0)
-        self.error_threshold = config.get('error_threshold', 5.0)
+        self.airbrakeMachThreshold = rocketConfig["active_drag_system"]["deployment_conditions"]["maximum_mach"]
+        self.deployment_time = rocketConfig["active_drag_system"]["full_deploy_time"]
+        self.error_threshold = config.get('error_threshold', 3.0)
         self.control_frequency = config.get('control_frequency', 100.0)
-        self.max_deployment = config.get('max_deployment', 100.0)
+        self.max_deployment = rocketConfig["active_drag_system"]["max_deployment"]
+        self.min_deployment = rocketConfig["active_drag_system"]["min_deployment"]
         self.kp = config.get('kp', .02)  # Proportional gain
         self.maxBrakeForece = rocketConfig["active_drag_system"]["max_brake_force"]  # Newtons
         
@@ -86,6 +87,8 @@ class AirbrakeController:
         self.current_deployment = 0.0
         self.predicted_apogee = 0.0
         self.last_update_time = 0.0
+
+        self.startDeploying = False
         
         # Calculate deployment rate (percent per second)
         self.deployment_rate = 100.0 / self.deployment_time
@@ -106,33 +109,45 @@ class AirbrakeController:
         """
         # Check if enough time has passed for controller update
         if time - self.last_update_time < (1.0 / self.control_frequency):
-            return self.current_deployment
-        if self.target_apogee - state[0] > 1000:
+            return self.current_deployment, getBrakeDrag(drag_args[0], state[1], self.current_deployment, state[0], drag_args[3])
+        if self.target_apogee - state[0] > 2500:
             self.error_threshold = 5
-            curr_target_apogee = self.target_apogee + 25
-            prediction_dt = 1
+            curr_target_apogee = self.target_apogee + 50
+            prediction_dt = 0.1
         else:
             self.error_threshold = 5
             curr_target_apogee = self.target_apogee
             prediction_dt = dt
         # Predict apogee using forward simulation
         # time_counter = timer.time()
-        self.predicted_apogee = self._predict_apogee(state, accel_consts, drag_args, prediction_dt)
+
+        pred_drag_args = drag_args.copy()
+        pred_drag_args[1] = self.current_deployment
+        self.predicted_apogee = self._predict_apogee(state, accel_consts, pred_drag_args, prediction_dt)
+
+
         # lastloop_time = timer.time() - time_counter
         # print(f"Loop Time: {lastloop_time*1000:.2f} ms")
         # Calculate error
         error = self.predicted_apogee - curr_target_apogee
+
+        if self.startDeploying == False:
+            threshold_drag_args = drag_args.copy()
+            threshold_drag_args[1] = self.min_deployment
+            brakeAlt = self._predict_apogee(state, accel_consts, threshold_drag_args, prediction_dt)
+            if brakeAlt - curr_target_apogee >= 0:
+                self.startDeploying = True
         
         # Adjust deployment if outside error threshold
-        if abs(error) > self.error_threshold and state[1] < self.airbrakeMachThreshold * speed_of_sound(state[0]):
+        if abs(error) > self.error_threshold and state[1] < self.airbrakeMachThreshold * speed_of_sound(state[0]) and self.startDeploying:
             # Proportional control: more error = faster deployment change
             # Positive error (too high) → increase deployment (more drag)
             # Negative error (too low) → decrease deployment (less drag)
-            deployment_change = self.deployment_rate * (time - self.last_update_time) * min(abs(error) * self.kp, 1.0)
+            deployment_change = self.deployment_rate * (time - self.last_update_time) #* min(abs(error) * self.kp, 1.0)
             
             if error > 0:  # Predicted apogee too high
                 #only deploy brakes if resulting drag is within max brake force
-                if getBrakeDrag(drag_args[0], state[1], self.current_deployment + deployment_change, state[0], drag_args[2]) < self.maxBrakeForece:
+                if getBrakeDrag(drag_args[0], state[1], self.current_deployment + deployment_change, state[0], drag_args[3]) < self.maxBrakeForece:
                     self.current_deployment = min(self.current_deployment + deployment_change, self.max_deployment)
                 if self.current_deployment > 100:
                     pass
@@ -140,7 +155,7 @@ class AirbrakeController:
                 self.current_deployment = max(self.current_deployment - deployment_change, 0.0)
         
         self.last_update_time = time
-        return self.current_deployment
+        return self.current_deployment, getBrakeDrag(drag_args[0], state[1], self.current_deployment, state[0], drag_args[3])
     
     def _predict_apogee(self, state, accel_consts, drag_args, dt):
         """
@@ -160,7 +175,7 @@ class AirbrakeController:
         
         # Update drag_args with current deployment
         pred_drag_args = drag_args.copy()
-        pred_drag_args[1] = self.current_deployment
+        # pred_drag_args[1] = self.current_deployment
         
         # Simulate forward until velocity reaches zero (apogee)
         max_iterations = 10000  # Safety limit
@@ -185,35 +200,6 @@ class AirbrakeController:
         self.current_deployment = 0.0
         self.predicted_apogee = 0.0
         self.last_update_time = 0.0
-
-
-def runge_kutta(state, accel_consts, drag_args, dt):
-    altitude = state[0]
-    velocity = state[1]
-
-    k1_velocity = state[1] # k1 = f(y0, t0)
-    k1_acceleration = get_acceleration(state, accel_consts, drag_args)
-    state[0] = altitude + 1/2*k1_velocity*dt
-    state[1] = velocity + 1/2*k1_acceleration*dt
-
-    k2_velocity = state[1] # k2 = f(y0+(k1 * dt/2), t0+(dt/2))
-    k2_acceleration = get_acceleration(state, accel_consts, drag_args)
-    state[0] = altitude + 1/2*k2_velocity*dt
-    state[1] = velocity + 1/2*k2_acceleration*dt
-
-    k3_velocity = state[1] # k3 = f(y0+(k2 * dt/2), t0+(dt/2))
-    k3_acceleration = get_acceleration(state, accel_consts, drag_args)
-    state[0] = altitude + 1/2 * k3_velocity*dt
-    state[1] = velocity + 1/2 * k3_acceleration*dt
-
-    k4_velocity = state[1] # k4 = f(y0+(k3*dt), t0+dt)
-    k4_acceleration = get_acceleration(state, accel_consts, drag_args)
-
-    # y1 = y0 + (1/6)*(k1 + 2*k2 + 2*k3 + k4)*dt
-    state[0] = altitude + 1/6*(k1_velocity + 2*k2_velocity + 2*k3_velocity + k4_velocity)*dt
-    state[1] = velocity + 1/6*(k1_acceleration + 2*k2_acceleration + 2*k3_acceleration + k4_acceleration)*dt
-
-    return state
 
 def runge_kutta_2d(state, accel_consts, drag_args, dt):
     """
