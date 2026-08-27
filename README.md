@@ -28,25 +28,67 @@ python main.py --config configs/competition_rocket_2026.json
 
 You get an apogee summary printed in the terminal and a window of comparison plots
 (altitude, velocity, acceleration, brake deployment, brake force) for the rocket with
-and without airbrakes. `--no-plot` skips the plots.
+and without airbrakes. After you close the plot window it asks whether to save - saying
+yes writes the plots, both trajectories as CSVs, and a summary of the config and
+results into `data/simulation_results/`, all timestamped. `--no-plot` skips the plots.
+
+That's the whole story for a rocket that already has a config. To sim a new rocket,
+follow the setup below.
+
+## Setting up a new rocket
+
+Everything the sim knows about a rocket comes from RASAero and a weather sounding,
+tied together by a config file. In order:
+
+1. **Model the rocket in RASAero** and run its flight simulation with your motor.
+
+2. **Export the aero plot data** (the CD vs Mach table) to a CSV in `data/aero/`.
+
+3. **Export the flight simulation data** (the time-series output) to a CSV in
+   `data/flight_sims/`. Name both exports by rocket and motor so they're
+   identifiable later.
+
+4. **Get a weather sounding** for the launch site into `data/weather/`, named by
+   date and station. The sim needs the `geopotential height_m`, `pressure_hPa`,
+   and `temperature_C` columns - it interpolates the real atmosphere from these
+   instead of using the standard atmosphere.
+
+5. **Make the config**: copy the closest existing file in `configs/`, then set the
+   rocket name, diameter, launch site altitude, the file paths from steps 2-4, and
+   the airbrake settings (target apogee, brake area, force limit, deployment
+   limits). `configs/README.md` explains every key and its units.
+
+6. **Fill in the burnout state** - don't type these numbers by hand:
+
+   ```
+   python utilities/import_rasaero.py data/flight_sims/your_export.CSV configs/your_config.json
+   ```
+
+   The sim starts at motor burnout (the brakes never deploy under power, so the
+   boost isn't simmed). The importer finds burnout in the RASAero export, converts
+   to metric, and writes the burnout altitude/velocity/acceleration/mass into the
+   config.
+
+7. **Run it**: `python main.py --config configs/your_config.json`. Sanity check
+   the baseline apogee against RASAero's projected apogee (the importer prints it) -
+   they should land within a few percent of each other. If they're way off, the
+   usual suspects are a wrong launch_altitude or mismatched aero/flight exports.
 
 ### How the sim works
 
-The sim starts at **motor burnout**, not liftoff - the brakes never deploy under
-power, so there's no reason to sim the boost. Burnout conditions (altitude, velocity,
-time) come from RASAero and live in the config file. From there it:
+From the burnout state in the config, the sim:
 
 1. Integrates the 2D trajectory (vertical + horizontal) to apogee with RK4
 2. Gets body drag from the RASAero CD-vs-Mach table and brake drag from
-   compressible dynamic pressure times the deployed face area
-3. Gets air density from a real weather balloon sounding for the launch site
-   instead of the standard atmosphere
-4. Runs the airbrake controller at 10 Hz: predict apogee by simulating ahead to
-   zero vertical velocity, compare against the target, and step the deployment
-   up or down
+   compressible dynamic pressure times the deployed face area (percent deploy is
+   linear in projected area, the same model the flight code runs)
+3. Gets air density from the weather sounding for the launch site
+4. Runs the airbrake controller: predict apogee by simulating ahead to zero
+   vertical velocity, compare against the target, and step the deployment up
+   or down
 
-To sim a new rocket, copy the closest config in `configs/` and update the numbers.
-`configs/README.md` explains every key and where to get the values.
+It runs twice - once with the brakes locked shut for a baseline, once with the
+controller active - and plots both.
 
 ## What's where
 
@@ -105,8 +147,12 @@ configs/*.json  +  data/aero/*.CSV  +  data/weather/*.csv
 
 `config_data.h` is generated - don't edit it by hand, your changes will get wiped the
 next time someone runs the script. Change the JSON config instead, rerun the script,
-and reflash. Before a launch, make sure the weather file in the config is a fresh
-sounding for the launch site.
+and reflash. The script reads the config named in `config_path` at the top of
+`flightDataFile.py`, so point that at your config first.
+
+Before a launch: get a fresh sounding for the launch site into the config's
+weather file, rerun `flightDataFile.py`, recompile, and reflash - otherwise the
+rocket flies with whatever atmosphere was baked in last time.
 
 ## Contributing
 
