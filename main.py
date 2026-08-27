@@ -47,6 +47,7 @@ import os
 import sys
 import json
 from pathlib import Path
+from datetime import datetime
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -307,8 +308,19 @@ class SimulationRunner:
         axs[0, 2].legend(["Maximum allowed brake force", "Base", "Airbrake Force (N)"])
         axs[0, 2].grid()
         plt.show()
-        
-    
+
+        # once the plot window is closed, offer to save the figure
+        try:
+            answer = input("Save these plots? (y/n): ")
+        except EOFError:
+            answer = ""
+        if answer.strip().lower().startswith("y"):
+            timestamp = datetime.now().strftime("%m-%d-%Y_%H_%M_%S")
+            plot_file = self.output_dir / "{}_{}.png".format(self.config_path.stem, timestamp)
+            fig.savefig(plot_file, dpi=200)
+            print("Saved plots to {}".format(plot_file))
+
+
     def export_results(self):
         """Export simulation results to CSV files"""
     
