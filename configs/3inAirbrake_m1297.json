@@ -1,0 +1,41 @@
+{
+    "rocket_name": "3in Airbrake Test Rocket",
+    "description": "3in Airbrake test rocket on a M1297 motor",
+    "dimensions": {
+        "length": 1.96,
+        "diameter": 0.079,
+        "fin_span": 0.097,
+        "nose_cone_length": 0.381
+    },
+    "mass_properties": {
+        "burnout_mass": 8.18
+    },
+    "file_paths": {
+        "aero_file": "data/aero/3inAirbrake.CSV",
+        "weather_file": "data/weather/2026061618-72265_IREC26Flight.csv"
+    },
+    "simulation_parameters": {
+        "time_step": 0.1,
+        "max_simulation_time": 300,
+        "launch_altitude": 300,
+        "burnout_time": 4.4,
+        "burnout_verticalVelocity": 409.87,
+        "burnout_horizontalVelocity": 0.0,
+        "burnout_acceleration": -56.56,
+        "burnout_altitude": 1541.8
+    },
+    "active_drag_system": {
+        "enabled": true,
+        "brake_face_area": 0.00516128,
+        "target_apogee_AGL": 4200.0,
+        "control_frequency": 10,
+        "full_deploy_time": 2.0,
+        "max_brake_force": 222,
+        "max_deployment": 100,
+        "min_deployment": 40,
+        "deployment_conditions": {
+            "min_time_after_burnout": 1.0,
+            "maximum_mach": 0.95
+        }
+    }
+}

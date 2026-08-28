@@ -9,6 +9,7 @@ numbers off the RASAero screen and typing them into the config by hand.
 
 Usage:
     python utilities/import_rasaero.py data/flight_sims/mmr_irec2026_finalPreflight.CSV configs/competition_rocket_2026.json
+    python utilities/import_rasaero.py data/flight_sims/3inAirbrake.CSV configs/3inAirbrake_m1297.json
 
 Notes:
     - RASAero exports in imperial (ft, lb, ft/s^2), configs are metric
