@@ -86,7 +86,7 @@ class AirbrakeController:
         # State
         self.current_deployment = 0.0
         self.predicted_apogee = 0.0
-        self.last_update_time = 0.0
+        self.last_update_time = None  # set on the first update call
 
         self.startDeploying = False
         
@@ -107,6 +107,13 @@ class AirbrakeController:
         Returns:
             float: Updated deployment percentage (0-100)
         """
+        # First call just sets the clock. The sim starts at burnout_time, not zero,
+        # so stepping deployment on this call would integrate the whole boost as
+        # elapsed time and jump the brakes way open on the first tick
+        if self.last_update_time is None:
+            self.last_update_time = time
+            return self.current_deployment, getBrakeDrag(drag_args[0], state[1], self.current_deployment, state[0], drag_args[3])
+
         # Check if enough time has passed for controller update
         if time - self.last_update_time < (1.0 / self.control_frequency):
             return self.current_deployment, getBrakeDrag(drag_args[0], state[1], self.current_deployment, state[0], drag_args[3])
@@ -199,7 +206,7 @@ class AirbrakeController:
         """Reset controller to initial state"""
         self.current_deployment = 0.0
         self.predicted_apogee = 0.0
-        self.last_update_time = 0.0
+        self.last_update_time = None
 
 def runge_kutta_2d(state, accel_consts, drag_args, dt):
     """
