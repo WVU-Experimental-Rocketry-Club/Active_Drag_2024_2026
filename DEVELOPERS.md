@@ -6,6 +6,17 @@ document covers how everything fits together, how a sim run actually flows throu
 the code, the physics model and its assumptions, and how to make changes without
 breaking things you didn't know existed.
 
+This guide **can** and **should** evolve over time, both as the code gets improved
+and as the team learns the best ways to work together on this software. The whole
+codebase started out as a single person working on it, so there will be many things
+that need to change as more and more people get their hands on it. 
+
+The biggest piece of advice I can give is to constantly remember that all of this
+software will be run in the future by people who are only marginally familiar
+with its origins and will not be well versed in the best principles for 
+writing and maintaining code, so make **everything** more robust and better documented
+than it feels like it needs to be. 
+
 ## The big picture
 
 There are two programs in this repo that must agree with each other:
@@ -180,8 +191,8 @@ fixing before actually flying the thing and seeing what happens.
 
 ## Performance notes
 
-The sim runs in seconds now, but it's easy to accidentally undo that. The hot
-path is: controller tick -> apogee prediction -> hundreds of RK4 steps -> 4
+The sim runs in seconds now, but it's easy to accidentally undo that. The important
+path to remember: controller tick -> apogee prediction -> hundreds of RK4 steps -> 4
 acceleration evals each -> drag -> atmosphere. Anything you add inside that chain
 runs hundreds of thousands of times per sim. The rules that keep it fast:
 
@@ -196,7 +207,7 @@ runs hundreds of thousands of times per sim. The rules that keep it fast:
 If it ever needs to be faster still (parameter sweeps, Monte Carlo), the next
 moves are coarser prediction timesteps far from apogee, re-predicting only when
 deployment changed, or Numba on the hot path. Don't bother doing any of that unless
-it actually becomes necessary, but DO look into doing some Monte Carlo runs to be
+it actually becomes necessary, but **DO** look into doing some Monte Carlo runs to be
 much more resilient to things like burnout mass uncertainty, CD uncertainty, etc.
 
 ## Making changes without breaking things
@@ -207,6 +218,19 @@ summary against an unmodified run. There is no automated test suite yet, so
 before/after runs ARE the test suite. Save the results (the y/n prompt after the
 plots) if you want a record - saved summaries include the config and date.
 
+Ideally, you should mostly branch off of and PR into a `dev` branch of some sort,
+whether that's a generic dev branch, a personal dev branch, etc. Try to save `main`
+for very well proven code. 
+
+You should also not get in the habit of approving your own PRs if you're working as
+a software team and not a solo developer. The software lead or a designated person
+should take a moment to glance through all of the proposed PR changes to make sure 
+everything will continue to work nicely. 
+
+There are many other best practices you can adopt for the software team, so you 
+should spend part of a meeting each semester going over how people should be working
+collaboratively on this project. 
+
 **Adding a config key**: three places or it doesn't exist - the config JSON
 itself, `REQUIRED_CONFIG_KEYS` in `main.py` (with units in the description - this
 is what generates the helpful error when someone's config is missing it), and
@@ -215,22 +239,17 @@ is what generates the helpful error when someone's config is missing it), and
 **Changing the physics**: change it in `src/core/` AND in
 `flightCodeSrc/mmrAirbrake/computations.cpp`, note it in the PR, and remember the
 rocket doesn't get the change until someone recompiles and reflashes. You can
-syntax-check the C++ without hardware using the compiler that ships with the
-Arduino RP2040 core:
-
-```
-arm-none-eabi-g++ -std=c++17 -Wall -fsyntax-only flightCodeSrc/mmrAirbrake/computations.cpp
-```
-
-(it lives under `%LOCALAPPDATA%\Arduino15\packages\rp2040\tools\pqt-gcc\...\bin`)
+syntax-check the C++ without hardware by running the 'verify' step in the Arduino
+IDE instead of 'compile and upload'. You can also write an intermediate C++ program
+that's designed to be compiled on your desktop to test out all of the software logic
+and computations without including any GPIO/sensors. 
 
 **Changing config values that fly**: rerun `utilities/flightDataFile.py` (point
 `config_path` at the top of it to your config) to regenerate `config_data.h`,
 recompile, reflash. Never edit `config_data.h` by hand.
 
 **Flown code is history**: the day something flies, tag the commit
-(`flown/kansas-2026` style) and don't touch that folder again -
-`mothmansRevenge/` is kept exactly as flown for this reason. Post-flight logs go
+(`flown/kansas-2026` style) and don't touch that folder again. Post-flight logs go
 in `Post Flight Data/`.
 
 **Time and altitude conventions**: sim time is seconds since liftoff (it just
@@ -241,7 +260,7 @@ bridge. When numbers look ~900 m off, this is why.
 ## Good next projects
 
 Roughly in order of value:
-- **CD validation in flight**: feed the inner rk4 loop an inaccurate CD curve
+- **CD correction in flight**: feed the inner rk4 loop an inaccurate CD curve
   and have your software be able to calculate the real CD based on accelerometer 
   data. This will let a flight still provide meaningful apogee corrections if the
   general CD curve shape is right but the scalar value is wrong, which is one of the 
@@ -256,6 +275,9 @@ Roughly in order of value:
   have to rebuild yours from scratch. The python sim should be able to run the "outer"
   RK4 loop, pass simulated "sensor" data to the actual hardware, and you should be able 
   to watch the hardware deploy the brakes in simulated real time. 
+- **RTOS Flight Code**: Moving the flight computer code over to a scheduled RTOS
+  architecture would be good for a whole host of reasons you can look into. FreeRTOS
+  has support for the RP2040/RP2350s.
 - **Sim/flight controller parity**: port the force gate and arming latch to
   `mmrAirbrake`, or make the sim optionally run a flight-accurate mode.
 - **A real test suite**: even five pytest checks (ISA density at sea level, drag
@@ -269,4 +291,28 @@ Roughly in order of value:
 - **Named data structures**: the `drag_args`/`accel_consts` positional lists and
   numbered results rows predate everything else and are the biggest readability
   wart left.
+
+## Other low priority projects but could be cool:
+
+- **Sounding auto-fetch**: pull the launch site sounding straight from the
+  University of Wyoming archive by date and station ID instead of downloading
+  CSVs by hand. Small script, removes a pre-launch chore.
+- **Run comparison overlay**: point the sim at two saved result sets and overlay
+  them on the same plots (`--compare`). Great for "did my change actually matter"
+  and for settling tuning arguments with pictures.
+- **Extra derived plots**: dynamic pressure, Mach vs time with the deployment
+  gate marked, and energy-to-apogee. All computable from the existing results
+  array, no new physics needed.
+- **Parameter sweep mode**: loop one config key over a range (brake area, target
+  apogee, mass) and plot apogee vs that parameter. Turns brake sizing into one
+  command instead of an afternoon of editing configs.
+- **Monte Carlo dispersion**: jitter burnout state, CD, and mass, run a few
+  hundred sims (they only take seconds each now), and histogram the apogees.
+  Gives you an error bar on the target instead of a single point estimate.
+- **KML trajectory export**: write sim trajectories as KML for Google Earth,
+  matching the Featherweight kml files already in Post Flight Data. Mostly fun
+  now, actually useful for recovery planning once descent gets modeled.
+- **Pre-flight card generator**: one command that renders a printable summary
+  (config, sounding date, predicted apogee with dispersion, deployment profile)
+  to bring to the pad.
 

@@ -160,7 +160,7 @@ Working on the code itself? Read [DEVELOPERS.md](DEVELOPERS.md) first - it cover
 how the sim flows, the physics model, and how to change things without breaking
 the sim/flight-code agreement.
 
-- Branch off `main`, PR back into `main`.
+- **Branch off `main`, PR back into `main`. Don't commit directly to `main`.**
 - Don't commit build output (`.o`, `.pyc`, compiled binaries) - the gitignore
   should catch it.
 - If you change what the sim reads from configs, update `REQUIRED_CONFIG_KEYS`
