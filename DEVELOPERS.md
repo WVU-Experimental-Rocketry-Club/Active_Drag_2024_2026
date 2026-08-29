@@ -257,9 +257,14 @@ starts partway through, at `burnout_time`). Altitude inside the sim is meters
 ASL; targets and RASAero exports are AGL; `launch_altitude` in the config is the
 bridge. When numbers look ~900 m off, this is why.
 
-## Good next projects
+## Good next projects (add to this list as you think of things)
 
 Roughly in order of value:
+- **Code Cleanup**: Look through and clean up lots of the quirks of the sim
+  that don't really make sense (most of them were rushed and 'god enough' at the time).
+  Things like the fact that the `utilities/flightDataFile.py` script dumps the config
+  directly into one of the flightCodeSrc folders ought to change to be more generally 
+  applicable. 
 - **CD correction in flight**: feed the inner rk4 loop an inaccurate CD curve
   and have your software be able to calculate the real CD based on accelerometer 
   data. This will let a flight still provide meaningful apogee corrections if the
@@ -292,26 +297,32 @@ Roughly in order of value:
   numbered results rows predate everything else and are the biggest readability
   wart left.
 
-## Other low priority projects but could be cool:
+## Other low priority projects but could be cool (add to this as well):
 
 - **Sounding auto-fetch**: pull the launch site sounding straight from the
   University of Wyoming archive by date and station ID instead of downloading
   CSVs by hand. Small script, removes a pre-launch chore.
+- **Adding a GUI**: Not really necessary at all, but might future-proof the project
+  so people with less experience can run it. Or make the move to some sort of compiled
+  desktop app so people can download and install a GUI based app without needing to 
+  ever look at the code in the background. 
 - **Run comparison overlay**: point the sim at two saved result sets and overlay
   them on the same plots (`--compare`). Great for "did my change actually matter"
   and for settling tuning arguments with pictures.
 - **Extra derived plots**: dynamic pressure, Mach vs time with the deployment
   gate marked, and energy-to-apogee. All computable from the existing results
-  array, no new physics needed.
+  array. Maybe make it an option on runtime or some sort of gui dropdown. 
 - **Parameter sweep mode**: loop one config key over a range (brake area, target
   apogee, mass) and plot apogee vs that parameter. Turns brake sizing into one
   command instead of an afternoon of editing configs.
 - **Monte Carlo dispersion**: jitter burnout state, CD, and mass, run a few
-  hundred sims (they only take seconds each now), and histogram the apogees.
+  hundred sims and histogram the apogees.
   Gives you an error bar on the target instead of a single point estimate.
 - **KML trajectory export**: write sim trajectories as KML for Google Earth,
   matching the Featherweight kml files already in Post Flight Data. Mostly fun
   now, actually useful for recovery planning once descent gets modeled.
+- **Integrated drift calcs**: Integrate a tool like the GPS driftcast web interface
+  to get a better idea of where the rocket will end up, with and without brake deployment. 
 - **Pre-flight card generator**: one command that renders a printable summary
   (config, sounding date, predicted apogee with dispersion, deployment profile)
   to bring to the pad.
