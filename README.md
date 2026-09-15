@@ -115,11 +115,13 @@ Each folder in `flightCodeSrc/` is one generation of the onboard code:
 
 | Folder | Status |
 |--------|--------|
-| `mmrAirbrake/` | **Current.** Flown at IREC 2026. ODrive-driven brakes. |
-| `mothmansRevenge/` | Flown at the Kansas test launch, March 2026. Stepper-driven. |
-| `AirbrakeController/`, `AirbrakeController_1/` | Early development versions. |
+| `mmrAirbrake/` | **Current.** Most similar to the code flown at IREC 2026. |
+| `mothmansRevenge/` | Development leading up to/around Kansas 2026. |
+| `AirbrakeController/`, `AirbrakeController_1/` | Development versions. |
 | `m10q_qwiic_check/` | GPS bring-up test sketch. |
 | `testBuzzer/` | Buzzer test sketch. |
+
+The code developments between Kansas 2026 and IREC 2026 are not all shared.
 
 The flight computer navigates on GPS alone (u-blox, 10 Hz) and runs the same
 predict-apogee-then-adjust loop as the Python controller. It logs to onboard flash;
