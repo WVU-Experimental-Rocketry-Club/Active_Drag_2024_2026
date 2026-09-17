@@ -36,9 +36,11 @@ into the flight code. Same settings, same lookup tables, two implementations.
 **VERY IMPORTANT: if you change the physics or the controller in
 one program, change it in the other (or write down why not).** The whole value of
 the simulator is that it predicts what the flight computer will do. Every time
-the two drift apart, sim results stop meaning anything. This has happened
-before and will happen again. Before every flight, try to have multiple people
-verify that the flight code agrees with the simulator.
+the two drift apart, sim results stop telling you what will happen in flight. 
+This has happened before and will happen again. 
+Before every flight, try to have multiple people
+verify that the flight code agrees with the simulator. HITL and SITL testing
+will help to verify this. 
 
 ## File Architecture
 
@@ -60,9 +62,9 @@ utilities/
   flightDataFile.py           generates config_data.h for the flight code
   import_rasaero.py           fills a config's burnout state from a RASAero export
 flightCodeSrc/
-  mmrAirbrake/                CURRENT flight code (IREC 2026, ODrive actuator)
-  mothmansRevenge/            as flown at Kansas 03/2026 (stepper) - kept as a record
-  AirbrakeController*/        early development versions
+  mmrAirbrake/                test version of flight code - actual IREC code isn't uploaded
+  mothmansRevenge/            test version for some of the code
+  AirbrakeController*/        development versions
 legacy/                       the original thesis-based single-file script
 data/flight_sims/             RASAero flight exports (importer input)
 Post Flight Data/             real logs from actual flights
@@ -73,9 +75,9 @@ A warning about the scaffold files: `stateMachine.py`, `navigation.py`,
 plausible-looking classes, but nothing imports them. They describe features that 
 ought to be implemented, but don't do anything yet. Don't assume something works because a
 docstring says it does - a few of the older docstrings describe features that
-were never built. When in doubt, trust the code, then the git history, then the
-comments. Tangentially related: make sure to update the comment blocks as you work
-so that they actually tend to represent the code underneath.
+were never built. When in doubt, trust the code over the
+comments. Make sure to update the comment blocks as you work
+so that they actually have a chance of representing the code underneath.
 
 ## How a sim run flows:
 
@@ -220,7 +222,10 @@ plots) if you want a record - saved summaries include the config and date.
 
 Ideally, you should mostly branch off of and PR into a `dev` branch of some sort,
 whether that's a generic dev branch, a personal dev branch, etc. Try to save `main`
-for very well proven code. 
+for well proven code, but don't let it sit stale so long that the eventual pull request
+is massive and difficult for a reviewer to go through. Do a PR after each sub-project
+or code change is completed and tested. You should **not** be committing directly to `main`
+though. 
 
 You should also not get in the habit of approving your own PRs if you're working as
 a software team and not a solo developer. The software lead or a designated person
@@ -229,9 +234,20 @@ everything will continue to work nicely.
 
 There are many other best practices you can adopt for the software team, so you 
 should spend part of a meeting each semester going over how people should be working
-collaboratively on this project. 
+collaboratively on this project. Make a coding conventions/style guide so everyone can
+reference it and be on the same page. 
 
-**Adding a config key**: three places or it doesn't exist - the config JSON
+A couple other coding tips: 
+- When you're writing a function, write it out in the most easily understandable way.
+  Nobody will be impressed by your ability to create the most arcane, unreadable function
+  that still technically works.  
+- Make code reviews a frequent part of regular meetings instead of leaving all the meetings
+  hardware focused.
+- Try making each piece of the code as modular as possible so different people can work on things
+  without breaking each others work or ending up with lots of merge conflicts. If you can,
+  try to lay out ahead of making changes who will be working in which sections of the code. 
+
+**Adding a config key**: add in three places at the same time - the config JSON
 itself, `REQUIRED_CONFIG_KEYS` in `main.py` (with units in the description - this
 is what generates the helpful error when someone's config is missing it), and
 `configs/README.md`.
@@ -242,7 +258,7 @@ rocket doesn't get the change until someone recompiles and reflashes. You can
 syntax-check the C++ without hardware by running the 'verify' step in the Arduino
 IDE instead of 'compile and upload'. You can also write an intermediate C++ program
 that's designed to be compiled on your desktop to test out all of the software logic
-and computations without including any GPIO/sensors. 
+and computations without including any GPIO/sensors. `desktop.cpp` was a version of this. 
 
 **Changing config values that fly**: rerun `utilities/flightDataFile.py` (point
 `config_path` at the top of it to your config) to regenerate `config_data.h`,
@@ -261,7 +277,7 @@ bridge. When numbers look ~900 m off, this is why.
 
 Roughly in order of value:
 - **Code Cleanup**: Look through and clean up lots of the quirks of the sim
-  that don't really make sense (most of them were rushed and 'god enough' at the time).
+  that don't really make sense (most of them were rushed and 'good enough' at the time).
   Things like the fact that the `utilities/flightDataFile.py` script dumps the config
   directly into one of the flightCodeSrc folders ought to change to be more generally 
   applicable. 
@@ -270,7 +286,10 @@ Roughly in order of value:
   data. This will let a flight still provide meaningful apogee corrections if the
   general CD curve shape is right but the scalar value is wrong, which is one of the 
   things we're still uncertain of and have not had any successful flights to validate
-  further guesses.
+  further guesses. For flight, it's better to conservatively guess a higher CD than reality
+  so the airbrakes deploy too little rather than too much. CD should also probably be a lookup
+  table rather than a linearized approximation around 0.85. Also, there's evidence that
+  Farha's thesis values are actually too low. Flight testing needs done to confirm. 
 - **Flight replay validation**: script that seeds the sim from a real flight
   log's burnout state (Post Flight Data has Blue Raven, Featherweight, and
   onboard logs from three flights) and overlays predicted vs actual. This will
@@ -283,47 +302,46 @@ Roughly in order of value:
 - **RTOS Flight Code**: Moving the flight computer code over to a scheduled RTOS
   architecture would be good for a whole host of reasons you can look into. FreeRTOS
   has support for the RP2040/RP2350s.
-- **Sim/flight controller parity**: port the force gate and arming latch to
-  `mmrAirbrake`, or make the sim optionally run a flight-accurate mode.
-- **A real test suite**: even five pytest checks (ISA density at sea level, drag
+- **A real test suite**: even just a few pytest checks (ISA density at sea level, drag
   increases with deployment, competition config apogee within a known band)
   would catch most accidental breakage. Unit tests are VERY VERY important, 
   and I haven't gotten around to doing them. But they will let you catch a lot of
   the errors (like the scalar issue at the TMO AD test flight), and give you peace of
-  mind that if the tests pass, your algorithm is probably still operating as expected. 
+  mind that if the tests pass, your algorithm at least passes for basic functionality. 
 - **Boost phase**: simulate from liftoff using a thrust curve (thrustcurve.org
-  has a free API) so the burnout import step disappears entirely.
-- **Named data structures**: the `drag_args`/`accel_consts` positional lists and
-  numbered results rows predate everything else and are the biggest readability
-  wart left.
+  has a free API) so the burnout import step disappears entirely. Definitely keep the ability
+  to run manual configs though, it's useful for post-flight analysis to see what a rocket 
+  *would* have done without airbrakes deploying based on its actual burnout state. 
 
 ## Other low priority projects but could be cool (add to this as well):
 
+- **Radio link & OTA updates**: Let the airbrake receive data updates over a radio link so you
+   don't have to open the bay to make changes. Also be able to test the deployment via radio. 
+   Also be able to get live flight telemetry from the thing. 
 - **Sounding auto-fetch**: pull the launch site sounding straight from the
   University of Wyoming archive by date and station ID instead of downloading
-  CSVs by hand. Small script, removes a pre-launch chore.
+  CSVs by hand.
 - **Adding a GUI**: Not really necessary at all, but might future-proof the project
   so people with less experience can run it. Or make the move to some sort of compiled
   desktop app so people can download and install a GUI based app without needing to 
   ever look at the code in the background. 
 - **Run comparison overlay**: point the sim at two saved result sets and overlay
-  them on the same plots (`--compare`). Great for "did my change actually matter"
-  and for settling tuning arguments with pictures.
+  them on the same plots (`--compare`). Would be nice to see how code updates actually
+  affect the outputs.
 - **Extra derived plots**: dynamic pressure, Mach vs time with the deployment
-  gate marked, and energy-to-apogee. All computable from the existing results
-  array. Maybe make it an option on runtime or some sort of gui dropdown. 
+  gate marked, and energy-to-apogee. Maybe make it an option on runtime or some sort of gui dropdown. 
 - **Parameter sweep mode**: loop one config key over a range (brake area, target
-  apogee, mass) and plot apogee vs that parameter. Turns brake sizing into one
-  command instead of an afternoon of editing configs.
+  apogee, mass) and plot apogee or deploy angle vs that parameter.
 - **Monte Carlo dispersion**: jitter burnout state, CD, and mass, run a few
   hundred sims and histogram the apogees.
-  Gives you an error bar on the target instead of a single point estimate.
+  Gives you an error bar on the target instead of a single point estimate. Would be 
+  really helpful for seeing how sensitive the system actually is to variables so you
+  know which ones are most important to get right. 
 - **KML trajectory export**: write sim trajectories as KML for Google Earth,
-  matching the Featherweight kml files already in Post Flight Data. Mostly fun
-  now, actually useful for recovery planning once descent gets modeled.
+  matching the Featherweight kml files already in Post Flight Data.
 - **Integrated drift calcs**: Integrate a tool like the GPS driftcast web interface
   to get a better idea of where the rocket will end up, with and without brake deployment. 
 - **Pre-flight card generator**: one command that renders a printable summary
   (config, sounding date, predicted apogee with dispersion, deployment profile)
-  to bring to the pad.
+  to bring to the RSO table. They are often a little sketched out by airbrakes. 
 
